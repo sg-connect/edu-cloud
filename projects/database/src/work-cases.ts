@@ -24,6 +24,20 @@ export class WorkRepository {
       .bind(id)
       .first<StoredWorkCase>();
   }
+  history(id: string) {
+    return this.db
+      .prepare(
+        "SELECT id,kind,revision,created_at,error FROM case_history WHERE case_id=? ORDER BY id DESC",
+      )
+      .bind(id)
+      .all();
+  }
+  historyEntry(id: string, entryId: string) {
+    return this.db
+      .prepare("SELECT * FROM case_history WHERE case_id=? AND id=?")
+      .bind(id, entryId)
+      .first<{ result: string | null; [key: string]: unknown }>();
+  }
   create(id: string, data: WorkCaseInput) {
     return this.db
       .prepare(

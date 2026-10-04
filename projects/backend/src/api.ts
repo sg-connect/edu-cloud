@@ -121,7 +121,16 @@ export async function handleApi(
         return json({ id: caseId }, 201);
       }
       const current = await cases.get(id);
-      if (!current) throw new HttpError(404, "Work case not found.");
+      if (!current) throw new HttpError(404, "Practice case not found.");
+      if (action === "history" && method === "GET") {
+        if (!parts[3]) return json((await cases.history(id)).results);
+        const entry = await cases.historyEntry(id, parts[3]);
+        if (!entry) throw new HttpError(404, "History entry not found.");
+        return json({
+          ...entry,
+          result: entry.result ? JSON.parse(entry.result) : null,
+        });
+      }
       if (!action && method === "GET") {
         return json({
           ...current,

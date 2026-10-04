@@ -281,7 +281,7 @@ export default function Workspace() {
             onClick={() => navigate("cases")}
           >
             <BriefcaseBusiness size={19} />
-            Work cases
+            Practice cases
           </button>
         </nav>
         <div className="sidebar-note">
@@ -312,7 +312,7 @@ export default function Workspace() {
                   : view === "tracks"
                     ? "Learning tracks"
                     : view === "cases"
-                      ? "Work cases"
+                      ? "Practice cases"
                       : "My principles"}
             </span>
           </div>

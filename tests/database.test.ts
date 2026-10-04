@@ -25,13 +25,10 @@ beforeAll(async () => {
       `projects/database/migrations/${file}`,
       "utf8",
     );
-    await db.batch(
-      schema
-        .split(";")
-        .map((s) => s.trim())
-        .filter(Boolean)
-        .map((s) => db.prepare(s)),
-    );
+    const statements = [
+      ...schema.matchAll(/\s*(CREATE TRIGGER[\s\S]*?END;|[^;]+;)/g),
+    ].map((match) => match[1]);
+    await db.batch(statements.map((sql) => db.prepare(sql)));
   }
   repo = new Repository(db);
 });
@@ -269,7 +266,7 @@ it("persists work cases, retrieves learning, deduplicates jobs and rejects stale
         proposed_solution: "Use a unique operation key.",
       })
     ).meta.changes,
-  ).toBe(1);
+  ).toBe(2);
   expect((await cases.update("case-one", 1, caseInput)).meta.changes).toBe(0);
   expect(
     (await cases.finish("case-one", 1, "old-token", caseReport)).meta.changes,
@@ -296,4 +293,47 @@ it("persists work cases, retrieves learning, deduplicates jobs and rejects stale
       .changes,
   ).toBe(0);
   await repo.deleteBook("case-book");
+});
+
+it("retains saved approaches and every completed review as immutable learning history", async () => {
+  const cases = new WorkRepository(await mf.getD1Database("DB"));
+  await cases.create("history-case", caseInput);
+  await cases.queue("history-case", 1, "fixture");
+  await cases.claim("history-case", 1, "first");
+  await cases.finish("history-case", 1, "first", caseReport);
+  await cases.queue("history-case", 1, "fixture");
+  await cases.claim("history-case", 1, "second");
+  await cases.finish("history-case", 1, "second", {
+    ...caseReport,
+    content: { ...caseReport.content, summary: "A second perspective" },
+  });
+  await cases.update("history-case", 1, {
+    ...caseInput,
+    proposed_solution: "Use a stable job identity and a unique constraint.",
+  });
+  const rows = (await cases.history("history-case")).results;
+  expect(rows.map((r) => r.kind)).toEqual([
+    "saved",
+    "review",
+    "review",
+    "saved",
+  ]);
+  expect(rows.map((r) => r.revision)).toEqual([2, 1, 1, 1]);
+  const original = await cases.historyEntry("history-case", String(rows[3].id));
+  expect(original?.proposed_solution).toBe(caseInput.proposed_solution);
+  const first = await cases.historyEntry("history-case", String(rows[2].id));
+  expect(JSON.parse(first!.result!).content.summary).toBe(
+    caseReport.content.summary,
+  );
+  expect(
+    await cases.historyEntry("different-case", String(rows[2].id)),
+  ).toBeNull();
+  await cases.finish("history-case", 1, "first", caseReport);
+  expect((await cases.history("history-case")).results).toHaveLength(4);
+  await cases.queue("history-case", 2, "fixture");
+  await cases.claim("history-case", 2, "failed");
+  await cases.fail("history-case", "failed", "Fixture failure");
+  expect((await cases.history("history-case")).results[0].kind).toBe("failed");
+  await cases.delete("history-case");
+  expect((await cases.history("history-case")).results).toHaveLength(0);
 });

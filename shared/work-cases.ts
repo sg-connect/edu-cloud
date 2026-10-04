@@ -52,3 +52,15 @@ export interface WorkCase extends WorkCaseInput {
   created_at: string;
   updated_at: string;
 }
+
+export interface CaseHistoryEntry {
+  id: number;
+  kind: "saved" | "review" | "failed";
+  revision: number;
+  created_at: string;
+  error: string | null;
+  title?: string;
+  context?: string | null;
+  proposed_solution?: string | null;
+  result?: CaseReport | null;
+}

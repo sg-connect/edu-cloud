@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useId } from "react";
 import {
   BriefcaseBusiness,
   Plus,
@@ -12,6 +12,7 @@ import type {
   WorkCaseInput,
   CaseReport,
   LearningSource,
+  CaseHistoryEntry,
 } from "../../../shared/work-cases";
 async function api<T>(
   path: string,
@@ -131,7 +132,7 @@ export default function WorkCases({
       setNotice(
         analyze
           ? "Review queued. You can leave this page and return later."
-          : "Work case saved.",
+          : "Practice case saved.",
       );
       await refresh();
     } catch (e) {
@@ -141,7 +142,12 @@ export default function WorkCases({
     }
   }
   async function remove() {
-    if (!record || !window.confirm(`Delete “${record.title}” and its review?`))
+    if (
+      !record ||
+      !window.confirm(
+        `Delete “${record.title}” and its entire learning history?`,
+      )
+    )
       return;
     setBusy(true);
     try {
@@ -159,13 +165,16 @@ export default function WorkCases({
       <div className="section-heading">
         <div>
           <span className="eyebrow">FROM LEARNING TO PRACTICE</span>
-          <h1>Work cases</h1>
-          <p>Bring a real engineering decision to your learning library.</p>
+          <h1>Practice cases</h1>
+          <p>
+            Learn from your engineering decisions and keep the story of how your
+            thinking evolves.
+          </p>
         </div>
         {!selected && (
           <button className="button primary" onClick={() => setSelected("new")}>
             <Plus size={16} />
-            New work case
+            New practice case
           </button>
         )}
       </div>
@@ -186,9 +195,9 @@ export default function WorkCases({
               <BriefcaseBusiness size={32} />
               <h3>Your learning, applied.</h3>
               <p>
-                Paste the task, architecture, technologies, and constraints from
-                your company’s Claude conversation. Add your own solution when
-                you’re ready to challenge it.
+                Bring a task, an idea, or a decision you want to learn from. Add
+                your current approach, explore suggestions from your reading,
+                and revisit your saved history.
               </p>
             </div>
           ) : (
@@ -218,7 +227,7 @@ export default function WorkCases({
             disabled={busy}
           >
             <ArrowLeft size={15} />
-            All work cases
+            All practice cases
           </button>
           {(selected === "new" || record) && (
             <>
@@ -242,7 +251,7 @@ export default function WorkCases({
                   disabled={busy}
                 />
                 <label htmlFor="case-context">
-                  Task and architecture context
+                  Situation and engineering context
                 </label>
                 <p className="case-hint">
                   Describe the goal, current architecture, stack, relevant code,
@@ -303,10 +312,10 @@ export default function WorkCases({
                   >
                     <Sparkles size={16} />
                     {running
-                      ? "Analyzing work case…"
+                      ? "Analyzing practice case…"
                       : record?.result
                         ? "Analyze again"
-                        : "Analyze work case"}
+                        : "Analyze practice case"}
                   </button>
                   {record && (
                     <button
@@ -352,6 +361,13 @@ export default function WorkCases({
                   <Report report={record.result} onSource={onSource} />
                 </>
               )}
+              {record && (
+                <PracticeHistory
+                  key={record.id}
+                  record={record}
+                  onSource={onSource}
+                />
+              )}
             </>
           )}
         </>
@@ -367,6 +383,7 @@ function Report({
   onSource: (bookId: string, chapterId: string) => void;
 }) {
   const { content, sources } = report;
+  const referencePrefix = useId().replace(/[^a-zA-Z0-9_-]/g, "");
   function refs(ids: string[]) {
     return (
       <div className="case-refs">
@@ -374,7 +391,10 @@ function Report({
           ids.map((id) => {
             const s = sources.find((s) => s.id === id);
             return s ? (
-              <a key={id} href={`#case-source-${encodeURIComponent(id)}`}>
+              <a
+                key={id}
+                href={`#case-source-${referencePrefix}-${encodeURIComponent(id)}`}
+              >
                 {s.title} · PDF p. {s.page}
               </a>
             ) : null;
@@ -406,8 +426,8 @@ function Report({
   }
   return (
     <div className="case-report">
-      <span className="eyebrow">ENGINEERING REVIEW</span>
-      <h2>A practical approach</h2>
+      <span className="eyebrow">LEARNING GUIDANCE</span>
+      <h2>Suggestions for your approach</h2>
       <p>{content.summary}</p>
       <p className="case-hint">
         Searched {report.coverage.searched} learning entries; selected{" "}
@@ -415,7 +435,7 @@ function Report({
         Unanalyzed book text is not searched. References show provenance, not
         proof that a recommendation fits.
       </p>
-      {cards("Recommended approach", content.approach)}
+      {cards("Approach to explore", content.approach)}
       {cards("Risks and tradeoffs", content.risks)}
       {cards("Your solution: strengths", content.solution_review.strengths)}
       {cards("Your solution: concerns", content.solution_review.concerns)}
@@ -439,7 +459,12 @@ function Report({
         <section>
           <h3>Learning material considered</h3>
           {sources.map((s) => (
-            <Source key={s.id} source={s} onSource={onSource} />
+            <Source
+              key={s.id}
+              source={s}
+              onSource={onSource}
+              referencePrefix={referencePrefix}
+            />
           ))}
         </section>
       )}
@@ -449,14 +474,16 @@ function Report({
 function Source({
   source: s,
   onSource,
+  referencePrefix,
 }: {
   source: LearningSource;
+  referencePrefix: string;
   onSource: (bookId: string, chapterId: string) => void;
 }) {
   return (
     <details
       className="case-source"
-      id={`case-source-${encodeURIComponent(s.id)}`}
+      id={`case-source-${referencePrefix}-${encodeURIComponent(s.id)}`}
     >
       <summary>
         {s.title} · {s.kind}
@@ -471,5 +498,100 @@ function Source({
         {s.book_title} / {s.chapter_title} · PDF p. {s.page}
       </button>
     </details>
+  );
+}
+
+function PracticeHistory({
+  record,
+  onSource,
+}: {
+  record: WorkCase;
+  onSource: (bookId: string, chapterId: string) => void;
+}) {
+  const [entries, setEntries] = useState<CaseHistoryEntry[]>([]);
+  const [loaded, setLoaded] = useState<Record<number, CaseHistoryEntry>>({});
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let active = true;
+    api<CaseHistoryEntry[]>(`/${record.id}/history`)
+      .then((rows) => {
+        if (active) setEntries(rows);
+      })
+      .catch((e) => {
+        if (active) setError(e.message);
+      });
+    return () => {
+      active = false;
+    };
+  }, [record.id, record.revision, record.status, record.updated_at]);
+  async function load(id: number) {
+    if (loaded[id]) return;
+    try {
+      const entry = await api<CaseHistoryEntry>(`/${record.id}/history/${id}`);
+      setLoaded((current) => ({ ...current, [id]: entry }));
+      setError("");
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+  return (
+    <section className="case-report case-history">
+      <span className="eyebrow">YOUR LEARNING JOURNEY</span>
+      <h2>Learning history</h2>
+      <p>
+        Every saved version and completed review stays here. Revisit your
+        earlier approach and the guidance you received.
+      </p>
+      {error && <p role="alert">{error}</p>}
+      {entries.map((row) => {
+        const entry = loaded[row.id];
+        return (
+          <details
+            key={row.id}
+            className="case-source"
+            onToggle={(e) => {
+              if (e.currentTarget.open) void load(row.id);
+            }}
+          >
+            <summary>
+              {row.kind === "saved"
+                ? "Saved approach"
+                : row.kind === "review"
+                  ? "Learning review"
+                  : "Review failed"}{" "}
+              · Version {row.revision} ·{" "}
+              {new Date(row.created_at + "Z").toLocaleString()}
+            </summary>
+            {!entry ? (
+              <p>Loading history…</p>
+            ) : (
+              <>
+                <h3>{entry.title}</h3>
+                {entry.context === null ? (
+                  <p>
+                    The original context for this older review was not retained
+                    before history was introduced.
+                  </p>
+                ) : (
+                  <>
+                    <h4>Situation at the time</h4>
+                    <p>{entry.context}</p>
+                    <h4>My approach at the time</h4>
+                    <p>
+                      {entry.proposed_solution ||
+                        "No proposed solution was added."}
+                    </p>
+                  </>
+                )}
+                {entry.error && <p>{entry.error}</p>}
+                {entry.result && (
+                  <Report report={entry.result} onSource={onSource} />
+                )}
+              </>
+            )}
+          </details>
+        );
+      })}
+    </section>
   );
 }

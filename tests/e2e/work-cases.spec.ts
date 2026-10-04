@@ -12,11 +12,13 @@ test("work case context and solution persist; review shows sources and becomes s
     await expect(
       page.getByRole("button", { name: "Add a book", exact: true }),
     ).toBeEnabled();
-    await page.getByRole("button", { name: "Work cases", exact: true }).click();
-    await page.getByRole("button", { name: "New work case" }).click();
+    await page
+      .getByRole("button", { name: "Practice cases", exact: true })
+      .click();
+    await page.getByRole("button", { name: "New practice case" }).click();
     await page.getByLabel("Case title").fill(title);
     await page
-      .getByLabel("Task and architecture context")
+      .getByLabel("Situation and engineering context")
       .fill(caseInput.context);
     await page
       .getByLabel("My proposed solution (optional)")
@@ -31,7 +33,9 @@ test("work case context and solution persist; review shows sources and becomes s
     await expect(
       page.getByRole("button", { name: "Add a book", exact: true }),
     ).toBeEnabled();
-    await page.getByRole("button", { name: "Work cases", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Practice cases", exact: true })
+      .click();
     await page.getByRole("button", { name: new RegExp(title) }).click();
     await expect(
       page.getByLabel("My proposed solution (optional)"),
@@ -56,10 +60,10 @@ test("work case context and solution persist; review shows sources and becomes s
       else await route.continue();
     });
     await page
-      .getByRole("button", { name: "Analyze work case", exact: true })
+      .getByRole("button", { name: "Analyze practice case", exact: true })
       .click();
     await expect(
-      page.getByRole("heading", { name: "A practical approach" }),
+      page.getByRole("heading", { name: "Suggestions for your approach" }),
     ).toBeVisible();
     await expect(
       page.getByRole("heading", { name: "Your solution: concerns" }),
@@ -70,6 +74,13 @@ test("work case context and solution persist; review shows sources and becomes s
       .fill("Use a unique operation key and handle conflicts.");
     await expect(
       page.getByText(/This review belongs to an earlier version/),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Learning history", exact: true }),
+    ).toBeVisible();
+    await page.getByText(/Saved approach · Version 1/).click();
+    await expect(
+      page.getByText(caseInput.proposed_solution, { exact: true }),
     ).toBeVisible();
     await page.setViewportSize({ width: 390, height: 844 });
     expect(
