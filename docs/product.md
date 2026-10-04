@@ -1,5 +1,7 @@
 # Product concept
 
+This document describes the broader product direction. See README for the implemented local slice; chapter chat and several deeper learning features remain planned.
+
 ## Problem and hypothesis
 
 AI makes producing code easier. Our product hypothesis is that developers still need deliberate practice in requirements, tradeoffs, correctness, maintenance, and operating software. We should validate that need with developers rather than assume AI necessarily weakens engineering skill.
@@ -29,19 +31,19 @@ The initial upload target is text-based PDF. EPUB is a later supported format; s
 
 ## Curriculum map
 
-| Area | Practical question | Evidence |
-| --- | --- | --- |
-| Requirements | What does success mean, and what can fail? | Acceptance criteria and constraints |
-| Fundamentals | Which data structure fits the workload? | Complexity estimate and measured example |
-| Design | Where should responsibilities and dependencies live? | Module boundaries and a change exercise |
-| Data | Which invariants must always hold? | Schema, constraints, migration plan |
-| Distributed systems | What happens after a timeout or duplicate delivery? | Retry and idempotency design |
-| Testing | Which evidence would expose an incorrect implementation? | Tests, counterexamples, and failure injection |
-| Security | Who may perform this action on this object? | Threat model and authorization cases |
-| Operations | How will we detect and recover from failure? | Metrics, alert, and recovery runbook |
-| Performance and cost | Which bottleneck matters under this workload? | Measurement and capacity estimate |
-| Engineering communication | Why this option under these constraints? | ADR with alternatives and consequences |
-| AI-assisted work | How do we verify generated changes? | Review findings and verification evidence |
+| Area                      | Practical question                                       | Evidence                                      |
+| ------------------------- | -------------------------------------------------------- | --------------------------------------------- |
+| Requirements              | What does success mean, and what can fail?               | Acceptance criteria and constraints           |
+| Fundamentals              | Which data structure fits the workload?                  | Complexity estimate and measured example      |
+| Design                    | Where should responsibilities and dependencies live?     | Module boundaries and a change exercise       |
+| Data                      | Which invariants must always hold?                       | Schema, constraints, migration plan           |
+| Distributed systems       | What happens after a timeout or duplicate delivery?      | Retry and idempotency design                  |
+| Testing                   | Which evidence would expose an incorrect implementation? | Tests, counterexamples, and failure injection |
+| Security                  | Who may perform this action on this object?              | Threat model and authorization cases          |
+| Operations                | How will we detect and recover from failure?             | Metrics, alert, and recovery runbook          |
+| Performance and cost      | Which bottleneck matters under this workload?            | Measurement and capacity estimate             |
+| Engineering communication | Why this option under these constraints?                 | ADR with alternatives and consequences        |
+| AI-assisted work          | How do we verify generated changes?                      | Review findings and verification evidence     |
 
 Teach principles as context-dependent tools. A learner should be able to explain when a familiar pattern is unnecessary or harmful.
 
@@ -81,12 +83,12 @@ Possible business model later: a free foundational track and paid guided paths o
 
 ## Naming candidates
 
-| Name | Strength | Tradeoff |
-| --- | --- | --- |
-| Engineering Workshop | Immediately conveys practical work | Broad and descriptive |
-| DevFoundry | Short, maker-oriented | Meaning needs a tagline |
-| Engineer's Compass | Emphasizes judgment and direction | Longer brand |
-| Software Craft Lab | Clear practice-oriented positioning | Less concise |
-| edu-cloud | Useful working repository name | Does not explain the learning promise |
+| Name                 | Strength                            | Tradeoff                              |
+| -------------------- | ----------------------------------- | ------------------------------------- |
+| Engineering Workshop | Immediately conveys practical work  | Broad and descriptive                 |
+| DevFoundry           | Short, maker-oriented               | Meaning needs a tagline               |
+| Engineer's Compass   | Emphasizes judgment and direction   | Longer brand                          |
+| Software Craft Lab   | Clear practice-oriented positioning | Less concise                          |
+| edu-cloud            | Useful working repository name      | Does not explain the learning promise |
 
 No trademark, domain, or product-name availability assessment has been performed. Keep the repository name while testing positioning.

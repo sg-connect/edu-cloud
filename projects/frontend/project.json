@@ -1,0 +1,26 @@
+{
+  "name": "frontend",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "projects/frontend",
+  "tags": ["layer:frontend"],
+  "implicitDependencies": ["backend"],
+  "targets": {
+    "dev": {
+      "command": "vite --config vite.config.ts --host 127.0.0.1 --port 3400 --strictPort",
+      "continuous": true
+    },
+    "build": {
+      "command": "vite build --config vite.config.ts",
+      "outputs": ["{projectRoot}/dist"],
+      "cache": false
+    },
+    "preview": {
+      "command": "vite preview --config vite.config.ts --host 127.0.0.1 --port 3400 --strictPort",
+      "continuous": true
+    },
+    "typecheck": {
+      "command": "tsc --noEmit -p projects/frontend/tsconfig.json"
+    }
+  }
+}

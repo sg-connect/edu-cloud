@@ -28,15 +28,15 @@ A short ADR covering the chosen identity, persistent states, database constraint
 
 Score each criterion from 0 (missing), through 1 (identified) and 2 (workable), to 3 (justified with failure evidence).
 
-| Criterion | Strong evidence |
-| --- | --- |
-| Identity | Stable job key plus an explicit version for intentional regeneration |
-| Concurrency | Database-enforced uniqueness and a conditional claim or equivalent |
-| Recovery | Expiring claims and safe takeover after a crash |
-| Side effects | Explains duplicate inference risk and distinguishes it from duplicate publication |
-| Dispatch | Durable intent/outbox and recovery for a lost queue send |
-| Testing | Duplicate delivery, concurrent consumers, crashes around commits, and regeneration |
-| Tradeoffs | States remaining failure windows and operational cost |
+| Criterion    | Strong evidence                                                                    |
+| ------------ | ---------------------------------------------------------------------------------- |
+| Identity     | Stable job key plus an explicit version for intentional regeneration               |
+| Concurrency  | Database-enforced uniqueness and a conditional claim or equivalent                 |
+| Recovery     | Expiring claims and safe takeover after a crash                                    |
+| Side effects | Explains duplicate inference risk and distinguishes it from duplicate publication  |
+| Dispatch     | Durable intent/outbox and recovery for a lost queue send                           |
+| Testing      | Duplicate delivery, concurrent consumers, crashes around commits, and regeneration |
+| Tradeoffs    | States remaining failure windows and operational cost                              |
 
 Accept equivalent defensible designs. Feedback must identify evidence and gaps rather than enforce a single implementation.
 

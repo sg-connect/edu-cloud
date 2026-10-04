@@ -1,0 +1,29 @@
+{
+  "$schema": "./node_modules/nx/schemas/nx-schema.json",
+  "defaultBase": "main",
+  "namedInputs": {
+    "default": [
+      "{projectRoot}/**/*",
+      "{workspaceRoot}/shared/**/*",
+      "{workspaceRoot}/tsconfig.json",
+      "{workspaceRoot}/vite.config.ts",
+      "{workspaceRoot}/vitest.config.ts",
+      "{workspaceRoot}/wrangler*.jsonc",
+      "{workspaceRoot}/package-lock.json"
+    ],
+    "production": ["default", "!{projectRoot}/**/*.test.ts"]
+  },
+  "targetDefaults": {
+    "build": {
+      "dependsOn": ["^build"],
+      "cache": true
+    },
+    "typecheck": {
+      "dependsOn": ["^typecheck"],
+      "cache": true
+    },
+    "test": {
+      "cache": false
+    }
+  }
+}

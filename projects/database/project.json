@@ -1,0 +1,23 @@
+{
+  "name": "database",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "library",
+  "sourceRoot": "projects/database",
+  "tags": ["layer:database"],
+  "implicitDependencies": [],
+  "targets": {
+    "migrate": {
+      "command": "wrangler d1 migrations apply edu-cloud-local --local --config wrangler.backend.jsonc",
+      "cache": false
+    },
+    "build": {
+      "command": "tsc --noEmit -p projects/database/tsconfig.json"
+    },
+    "typecheck": {
+      "command": "tsc --noEmit -p projects/database/tsconfig.json"
+    },
+    "test": {
+      "command": "vitest run --config vitest.config.ts tests/database.test.ts"
+    }
+  }
+}

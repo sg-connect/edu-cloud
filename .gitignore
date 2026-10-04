@@ -11,3 +11,14 @@ uploads/
 private/
 *.pdf
 *.epub
+
+.next/
+.vinext/
+.vite/
+*.tsbuildinfo
+playwright-report/
+test-results/
+.local/
+
+.nx/
+**/dist/

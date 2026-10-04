@@ -1,0 +1,28 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "edu-cloud-web",
+  "main": "vinext/server/fetch-handler",
+  "compatibility_date": "2026-10-04",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "projects/frontend/dist/client",
+    "binding": "ASSETS",
+    "not_found_handling": "none",
+  },
+  "vars": {
+    "APP_MODE": "local",
+  },
+  "observability": {
+    "enabled": true,
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 0.1,
+    },
+  },
+  "services": [
+    {
+      "binding": "BACKEND",
+      "service": "edu-cloud-backend",
+    },
+  ],
+}

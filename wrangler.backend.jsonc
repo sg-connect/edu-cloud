@@ -1,0 +1,51 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "edu-cloud-backend",
+  "main": "projects/backend/src/index.ts",
+  "compatibility_date": "2026-10-04",
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "APP_MODE": "local",
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "edu-cloud-local",
+      "database_id": "00000000-0000-0000-0000-000000000001",
+      "migrations_dir": "projects/database/migrations",
+    },
+  ],
+  "r2_buckets": [
+    {
+      "binding": "BOOKS",
+      "bucket_name": "edu-cloud-local-books",
+    },
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "JOBS",
+        "queue": "edu-cloud-analysis",
+      },
+    ],
+    "consumers": [
+      {
+        "queue": "edu-cloud-analysis",
+        "max_batch_size": 1,
+        "max_batch_timeout": 1,
+        "max_retries": 2,
+        "dead_letter_queue": "edu-cloud-failed",
+      },
+    ],
+  },
+  "triggers": {
+    "crons": ["*/5 * * * *"],
+  },
+  "observability": {
+    "enabled": true,
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 0.1,
+    },
+  },
+}

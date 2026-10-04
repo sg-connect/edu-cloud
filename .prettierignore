@@ -1,0 +1,9 @@
+node_modules
+**/dist
+.wrangler
+.nx
+.local
+.env
+worker-configuration.d.ts
+projects/backend/worker-configuration.d.ts
+package-lock.json

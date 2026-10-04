@@ -1,120 +1,83 @@
-# Cloudflare architecture proposal
+# Architecture
 
-Status: design proposal, 2026-10-04. Product documentation checked during drafting. No resources provisioned; account eligibility, model quality, plan limits, and budget must be verified during implementation.
+Updated 2026-10-04. The local foundation is implemented. Hosted authentication, provisioning, and deployment remain future work.
 
-## Start small
+## Nx boundaries
 
-Use a modular TypeScript application: one web/API Worker and one background consumer Worker. Frontend: Next.js App Router conventions, deployed on Workers through the proposed vinext runtime, with Workers Static Assets. vinext reimplements Next.js APIs on Vite; it is not the stock Next.js runtime. Verify required framework features before scaffolding. This follows the current [Cloudflare Next.js guide](https://developers.cloudflare.com/workers/framework-guides/web-apps/nextjs/). Keep business logic in domain modules so deployment boundaries can evolve independently.
+| Project    | Owns                                                           | Allowed dependencies                             |
+| ---------- | -------------------------------------------------------------- | ------------------------------------------------ |
+| `frontend` | Next.js-style routes, React interface, browser PDF extraction  | Shared contracts; backend HTTP/service interface |
+| `backend`  | API use cases, validation, R2 files, OpenAI, asynchronous jobs | Shared contracts; database repository            |
+| `database` | D1 queries, atomic batches, schema, migrations                 | Shared types and D1 binding                      |
 
-| Component | Responsibility | When |
-| --- | --- | --- |
-| Workers + Static Assets | UI, API, authorization, submissions | First slice |
-| D1 | Users, curriculum, attempts, reviews, job state | First slice |
-| R2, private buckets | Private PDFs, extracted chapter text, analysis artifacts | First slice |
-| Queues | Buffer chapter-analysis requests and processing bursts | First slice |
-| Workers AI | Chapter explanations, principle extraction, grounded discussion | First slice, gated by extraction and quality evaluation |
-| Workflows | Durable orchestration when ingestion needs multiple long-running steps | Deferred; start with bounded queue jobs |
-| Vectorize + Workers AI embeddings | Custom retrieval with edition and location provenance | When curated retrieval becomes insufficient |
-| Containers | Parsing/OCR dependencies requiring Linux | Only after profiling actual documents |
-| Durable Objects / Agents SDK | Live shared state or genuinely stateful agent interactions | Deferred pending a concrete need |
+The frontend's route handler forwards to a Cloudflare service binding. It never imports the database repository. The backend instantiates that repository with its D1 binding; all SQL stays in the database project. Both API and queue handlers run in the same backend Worker. There is no extra analysis service to operate.
 
-Cloudflare supplies [static asset hosting](https://developers.cloudflare.com/workers/static-assets/), [SQL storage with D1](https://developers.cloudflare.com/d1/), [object storage with R2](https://developers.cloudflare.com/r2/), and [model inference with Workers AI](https://developers.cloudflare.com/workers-ai/). These capabilities fit the proposed separation; this is a design choice, not a claim that all components are necessary from day one.
-
-## Core reading flow
-
-An authenticated upload creates a private source record and R2 object. Finalization queues a bounded extraction job that preserves PDF-page locators and proposes chapter boundaries. Keep step state in D1; split work into independently retryable bounded jobs where needed. The reader confirms or corrects the outline. A selected chapter is queued for analysis; the consumer loads authorized chunks, calls Workers AI, validates citations, and stores a versioned result. Chapter discussion uses that chapter and explicitly selected context, bounded to the chosen model context window. Long chapters require chunk-level analysis followed by a grounded synthesis; never assume an entire book fits in one prompt.
-
-Separate ingestion state (`uploaded`, `extracting`, `outline_ready`, `needs_review`, `failed`) from chapter analysis state (`pending`, `queued`, `analyzing`, `ready`, `failed`). Retrying one chapter must not reprocess the whole book. Key analyses by source version, chapter version, prompt version, and model. Editing boundaries invalidates affected results and clearly marks old discussions as based on the previous version.
-
-## Asynchronous job and optional exercise-review flow
+Framework: vinext 1.x implements the Next.js API surface on Vite. It is not the stock Next.js runtime. The App Router, React client interface, route handlers, and Cloudflare service binding are verified locally. See [Cloudflare Next.js guidance](https://developers.cloudflare.com/workers/framework-guides/web-apps/nextjs/).
 
 ```mermaid
 flowchart TD
-    B[Browser] --> W[Web and API Worker]
-    W --> S[Static Assets]
-    W --> D[(D1)]
-    W --> R[(Private R2)]
-    W --> Q[Processing Queue]
-    Q --> C[Consumer Worker]
-    C --> A[Workers AI]
-    C --> D
-    C --> R
-    Q --> DLQ[Dead-letter Queue]
-    T[Scheduled reconciliation] --> D
-    T --> Q
+  B[Browser / PDF.js] --> F[frontend Worker]
+  F -->|service binding| API[backend Worker API]
+  API --> R[(Private R2)]
+  API --> REPO[database repository]
+  REPO --> D[(D1)]
+  API --> Q[Analysis Queue]
+  Q --> C[backend queue handler]
+  C --> REPO
+  C --> R
+  C --> O[OpenAI Responses API]
+  Q --> DLQ[Failed-message queue]
 ```
 
-An analysis job or submitted attempt and an outbox record are written together using an atomic D1 batch. After commit, the Worker tries to dispatch the job. A scheduled reconciliation pass republishes undispatched outbox records. Queue messages carry IDs and versions, not document bodies. The browser polls authorized status endpoints initially.
+## Local runtime
 
-[Queues delivers at least once and does not guarantee ordering](https://developers.cloudflare.com/queues/reference/delivery-guarantees/). Consumers therefore claim jobs using conditional updates and a lease, deduplicate by job ID plus input and analysis version, and persist results under a unique key. Retry with bounded backoff, then route exhausted messages to a dead-letter queue. Persist the result before acknowledgment. An expired lease allows recovery; a stale worker cannot overwrite a newer result. A crash around inference can still cause repeated model calls and cost, even when the final result is deduplicated.
+The Cloudflare Vite plugin runs both Workers with workerd/Miniflare. D1, R2, and Queues are simulated locally with persistence under `.wrangler/state/`. Remote bindings are disabled. Root Wrangler configurations define the services and a placeholder local database ID; they are not production deployment configs.
 
-There is no cross-service transaction between D1, R2, Queues, and an AI call. Use explicit state transitions, idempotent writes, and reconciliation for partial failures.
+OpenAI is the one external runtime dependency in this version, explicitly selected for the local build. `.env` supplies the key/model to server environments; there are no public-prefixed secret variables. Requests use the Responses API with structured output and `store: false`. Model choice is configurable. See [OpenAI Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs).
 
-## Data model sketch
+## PDF and chapter flow
 
-- `users`, `sessions`: identity, roles, session expiry.
-- `principles`: saved concepts linked to chapter citations.
-- `tracks`, `track_items`, `track_progress`: ordered references to chapters/principles and learner progress.
-- `labs`, `lab_versions`, `rubric_versions`: immutable published learning material.
-- `attempts`, `attempt_revisions`: learner-owned submissions tied to lesson versions.
-- `reviews`: rubric results, supporting evidence, prompt/model version, usage, status.
-- `skill_evidence`: links from attempts to demonstrated principles; revisable estimates.
-- `books`, `chapters`, `chapter_versions`: ordered chapter boundaries, extraction quality, user corrections.
-- `chapter_analyses`, `reading_progress`, `notes`, `discussion_messages`: owner-scoped reading and understanding.
-- `sources`, `source_versions`: owner, visibility, edition, checksum, permission record, status.
-- `source_chunks`: location and R2 key, plus future embedding identifiers.
-- `citations`: lesson/review claim linked to a source version and locator.
-- `jobs`, `outbox`, `usage_events`: durable processing and cost attribution.
+1. Browser PDF.js extracts page text and proposes chapters from bookmarks or chapter headings. A fallback groups pages and labels them as page ranges.
+2. The backend bounds the request, verifies a PDF signature and metadata shape, and validates page order and chapter ranges.
+3. R2 stores the original PDF and extracted pages. A D1 atomic batch creates book and chapter records. Failed database creation triggers object cleanup.
+4. The reader checks/corrects the chapter outline before starting analysis.
+5. Analysis creates a unique job for a chapter/version and publishes its ID to the queue. The job record also acts as a dispatch outbox.
+6. The consumer atomically claims work with a lease token, retrieves that chapter's pages from R2, and requests a structured analysis.
+7. Returned evidence excerpts must occur on the cited source pages. Invalid output is not saved as a successful analysis.
+8. An atomic D1 batch writes the result and marks the job ready, conditional on the worker still holding the lease.
+9. The UI polls status; results, notes, and saved principles remain available after reloads and restarts.
 
-Use server-derived ownership on every private query, foreign keys, uniqueness constraints, and indexes on user/time, publication status, and job status. Keep book bodies and large artifacts out of D1. Watch database growth and query behavior against [D1 limits](https://developers.cloudflare.com/d1/platform/limits/); do not assume infinite capacity in a single database. Begin with one database per environment; revisit partitioning based on evidence.
+PDF extraction is client-side to keep the first runtime simple. Before supporting untrusted multi-user uploads, decide whether server-side re-extraction is necessary to establish that submitted text corresponds to the uploaded PDF. Scans and diagrams are not OCR'd; users can open the original PDF.
 
-## Core book ingestion and chapter analysis
+## Data ownership
 
-```mermaid
-flowchart LR
-    U[Authorized upload] --> R[(Private R2)]
-    R --> F[Finalize and validate]
-    F --> W[Bounded queue jobs]
-    W --> P[Extract text]
-    P -. Linux or OCR needed .-> C[Container parser]
-    P --> K[Chunks and source locations]
-    K --> A[Workers AI analysis]
-    K -. Semantic retrieval .-> V[Vectorize]
-    A --> H[Private analysis and reader inspection]
-    H --> D[(Chapter analyses in D1)]
-```
+- `books`, `chapters`: source object references, page ranges, order, version.
+- `jobs`, `analyses`: state, dispatch marker, lease token/expiry, model, token usage, result.
+- `notes`: one editable private note per chapter.
+- `tracks`, `track_items`: saved principles, provenance, insertion order, applied status.
 
-Begin with one processing queue and explicit D1 job states for extraction and chapter analysis. Add [Workflows](https://developers.cloudflare.com/workflows/) if measured ingestion needs durable orchestration across long-running steps. If added, it owns the ingestion state machine; avoid two independent retry owners for the same step. [Containers](https://developers.cloudflare.com/containers/) is a conditional runtime for dependencies outside Workers, not a baseline service.
+Foreign keys cascade deletion of a book through chapters, jobs, analyses, notes, and saved principles. Default learning tracks are seeded by the first migration. Full book text lives in R2 rather than D1.
 
-For retrieval, begin with explicitly attached source passages. Later choose [Vectorize](https://developers.cloudflare.com/vectorize/) when we need control over chunks, access scope, and citation provenance. Evaluate managed AI Search as an alternative at that point rather than maintaining both retrieval systems.
+## Failure behavior
 
-## Identity and boundaries
+[Queues provides at-least-once delivery](https://developers.cloudflare.com/queues/reference/delivery-guarantees/). Unique chapter/version jobs prevent duplicate result rows. Conditional lease claims prevent concurrent publication, and stale workers cannot replace a newer result. An uncertain external AI call may still be billed more than once after recovery; no exactly-once billing guarantee is claimed.
 
-Proposed developer-facing pilot login: GitHub OAuth with sessions stored in D1 and secure, HttpOnly cookies. GitHub is an external identity dependency; app compute, persistence, and inference remain on Cloudflare. Confirm this interpretation of “entirely Cloudflare” before implementing login. Cloudflare Access is an alternative for an invitation-only pilot.
+Provider/validation errors produce a visible failed job and require explicit retry. Transport failures can retry at the queue layer. The scheduled handler reconciles undispatched jobs and marks expired leases as failed. Cron triggers must be invoked manually in local development; the chapter's recovery control can requeue an expired job. Already completed jobs are reused rather than regenerated.
 
-The Worker authorizes all API and download requests. Private files have no public bucket endpoint. Upload grants must be short-lived and scoped to a server-created object key, with size/type verification before processing. Cross-user access is rejected before retrieval and rechecked before presenting citations. Escape rendered source content; treat retrieved text as data, never as tool instructions. Model output cannot publish lessons, change permissions, or execute code.
+There is no D1/R2/Queue cross-service transaction. R2 deletion precedes deleting the D1 source record so a partial deletion remains retryable. In-flight jobs can only publish while their job row still exists. A full production reconciliation/backup process is future work.
 
-The first version accepts explanations and test plans, with optional local exercise code. Hosted execution of learner or generated code is deferred and would require a separate isolated execution design, resource limits, restricted egress, and no production credentials.
+## Access and limits
 
-## Reliability, cost, and deployment
+This prototype accepts only localhost requests. Mutations require a same-origin header. The development server binds to 127.0.0.1. These are local-development guards, not authentication or a multi-user authorization system. Never expose this build through a public tunnel.
 
-Separate development, staging, and production resources. Commit migrations and deployment configuration once the implementation starts. Store credentials only in secrets bindings. Exercise queue retries, cross-user access, and restore procedures before a public launch. Database rollback does not restore R2 objects or external side effects; keep source versions and a documented reconciliation procedure.
+Limits: 20 MB PDFs, 600 pages, 3 million extracted characters per book, 30,000 per page, 65,000 per analyzed chapter, 100 chapter ranges, 20,000-character notes, and bounded model output. The UI states when a request sends chapter text to OpenAI. No AI call happens automatically on upload.
 
-Track request/job IDs, queue age, dead letters, inference failures, usage per review, D1 query load, and storage growth. Redact uploaded content and credentials from logs. Set upload limits, per-user review quotas, model token limits, and concurrency caps. Save completed versioned analyses so retries and repeated views do not regenerate them unnecessarily.
+## Later Cloudflare capabilities
 
-No monthly price is promised yet. Estimate it from measured reviews per learner, tokens per review, pages processed, retained storage, and optional container runtime; use current product pricing before launch. Evaluate candidate Workers AI models on factual grounding, useful feedback, latency, and cost before pinning one.
+- Workers AI: alternative inference adapter if model evaluation supports switching.
+- Workflows: durable orchestration if document processing becomes multi-step and long-running.
+- Containers: server-side parsing/OCR when dependencies require Linux.
+- Vectorize: access-aware cross-book retrieval once direct chapter context is insufficient.
+- Authentication and per-user ownership: required before hosting.
 
-## Keep the codebase simple
-
-One repository and package, one Next.js-style web application, one background Worker, one D1 database and one private R2 bucket per environment. Use thin routes and ordinary feature folders; a large package hierarchy or Nx workspace is unnecessary for the first version.
-
-```text
-src/app/             Next.js routes and layouts
-src/features/        library, chapters, tracks, notebook
-src/server/          authorization, D1 queries, R2 access, AI calls
-workers/jobs/        bounded extraction and analysis handlers
-migrations/          D1 schema changes
-docs/                product and architecture decisions
-```
-
-The data model above includes future concepts. Implement only users/sessions, books/source versions, chapters, analyses, notes, tracks/items/progress, and durable job records for the first slice. Exercise rubrics, skill graphs, editorial publishing, and cross-book retrieval come later.
+These capabilities have not been provisioned. Keep the initial app small and add each for a demonstrated requirement.

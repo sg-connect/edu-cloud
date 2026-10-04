@@ -33,4 +33,4 @@ Consider isolated executable labs, collaboration, team reading groups, and mento
 
 ## Current delivery boundary
 
-This repository contains the product and architecture proposal, not a running application. No Cloudflare resources have been provisioned. Implementation begins with the private PDF-to-chapter-understanding loop after this product discussion.
+The local PDF-to-chapter-analysis loop is implemented in three Nx projects: frontend, backend, and database. It uses local Cloudflare D1/R2/Queues and OpenAI inference, with notes and principle tracks. Authentication, chapter discussion, richer tracks, and hosted deployment remain open. No Cloudflare resources have been provisioned. See README and local-development.md for current functionality and verification.

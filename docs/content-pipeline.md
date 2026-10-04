@@ -1,5 +1,7 @@
 # Books and source analysis
 
+This is the broader pipeline design. The local implementation currently extracts text-based PDFs in the browser and analyzes selected chapters through a Queue and OpenAI. Editorial publishing, OCR, embeddings, and automated multi-step ingestion remain planned.
+
 ## Book-first experience
 
 Upload → extract → detect chapters → confirm outline → analyze selected chapter → discuss → save principles → apply. Private chapter analysis is available to its owner after automated checks; human editorial approval is required only when promoting material into shared curriculum.
@@ -16,7 +18,7 @@ Every published claim derived from a source needs a verifiable locator: title, a
 
 Start with user-uploaded text-based PDFs for which processing is permitted. Candidate inputs are author-provided material, appropriately licensed works, public-domain works, and uploads for which the uploader has relevant processing permission. Public access to a URL is not itself a permission record. Buying a book does not automatically mean its text can be republished in this app.
 
-Commercial architecture books can initially appear as bibliographic reading references. Full-text ingestion and publication remain separate permissions. No books have been downloaded or analyzed in this project yet.
+Commercial architecture books can initially appear as bibliographic reading references. Full-text ingestion and publication remain separate permissions. The local app includes an original sample PDF used to verify the analysis flow; no commercial book content is included in the repository.
 
 Keep user uploads and derived private material scoped to their owner. A private upload never automatically becomes shared curriculum. Store permission basis, permitted uses, attribution requirements, owner, and visibility with each source. Public lesson publication requires editorial review of both content and permitted use. This is a proposed product policy, not a legal determination for any particular book.
 
