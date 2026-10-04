@@ -4,7 +4,6 @@ import {
   MAX_PDF_BYTES,
   MAX_PDF_MB,
   pdfSizeError,
-  MAX_CHAPTER_CHARS,
   uploadSchema,
   chapterInput,
   validateChapters,
@@ -330,14 +329,7 @@ export async function handleApi(
           "Add OPENAI_API_KEY to .env and restart the local app.",
         );
       const chapter = await getChapter(env, id);
-      const pages = (await readPages(env, chapter.book_id)).filter(
-        (p) => p.page >= chapter.start_page && p.page <= chapter.end_page,
-      );
-      if (pages.reduce((n, p) => n + p.text.length, 0) > MAX_CHAPTER_CHARS)
-        throw new HttpError(
-          400,
-          "This chapter is too long. Split the outline into smaller page ranges before analyzing.",
-        );
+      await readPages(env, chapter.book_id);
       const jobId = `${id}:${chapter.version}`;
       await repo.queueJob(
         jobId,

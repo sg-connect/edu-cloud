@@ -68,7 +68,7 @@ Run `npx playwright install chromium` once before browser tests. Automated tests
 
 This is a **single-user, localhost-only prototype**. Hosting is a later step: add authentication and ownership checks, real resource IDs, deployed secrets, and operational limits first. No Cloudflare resources have been provisioned or deployed.
 
-Text-based PDFs up to 100 MB / 600 pages are supported, with extraction limits. Scanned PDFs, OCR, EPUB, chapter chat, cross-book search, and executable exercises are not implemented. Chapters exceeding 65,000 extracted characters must be split before analysis. Chapter outlines lock once analysis or notes exist. Saved principles form tracks in insertion order; drag reordering is not implemented.
+Text-based PDFs up to 100 MB / 600 pages are supported, with extraction limits. Scanned PDFs, OCR, EPUB, chapter chat, cross-book search, and executable exercises are not implemented. Large chapters are automatically analyzed in sections of up to 65,000 extracted characters. Each section uses a separate OpenAI call; completed sections are reused on retry. Chapter outlines lock once analysis or notes exist. Saved principles form tracks in insertion order; drag reordering is not implemented.
 
 Use material you have permission to process. Private books, extracted text, generated analyses, secrets, and local state never belong in this public repository. No project license has been selected yet.
 

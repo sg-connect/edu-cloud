@@ -209,14 +209,16 @@ export class Repository {
   pendingJobs() {
     return this.db
       .prepare(
-        "SELECT id FROM jobs WHERE status='queued' AND dispatched_at IS NULL LIMIT 10",
+        "SELECT id,attempts FROM jobs WHERE status='queued' AND dispatched_at IS NULL LIMIT 10",
       )
-      .all<{ id: string }>();
+      .all<{ id: string; attempts: number }>();
   }
-  dispatched(id: string) {
+  dispatched(id: string, attempts: number) {
     return this.db
-      .prepare("UPDATE jobs SET dispatched_at=? WHERE id=? AND status='queued'")
-      .bind(Date.now(), id)
+      .prepare(
+        "UPDATE jobs SET dispatched_at=? WHERE id=? AND status='queued' AND attempts=?",
+      )
+      .bind(Date.now(), id, attempts)
       .run();
   }
   claim(id: string, token: string) {
@@ -242,6 +244,36 @@ export class Repository {
         pages_key: string;
         model: string;
       }>();
+  }
+  analysisParts(id: string, model: string) {
+    return this.db
+      .prepare(
+        "SELECT part_index,result FROM analysis_parts WHERE job_id=? AND model=? ORDER BY part_index",
+      )
+      .bind(id, model)
+      .all<{ part_index: number; result: string }>();
+  }
+  saveAnalysisPart(
+    id: string,
+    token: string,
+    index: number,
+    model: string,
+    result: unknown,
+  ) {
+    return this.db
+      .prepare(
+        "INSERT INTO analysis_parts(job_id,part_index,model,result) SELECT id,?,?,? FROM jobs WHERE id=? AND lease_token=? AND status='running' ON CONFLICT(job_id,part_index) DO UPDATE SET model=excluded.model,result=excluded.result",
+      )
+      .bind(index, model, JSON.stringify(result), id, token)
+      .run();
+  }
+  continueJob(id: string, token: string) {
+    return this.db
+      .prepare(
+        "UPDATE jobs SET status='queued',dispatched_at=NULL,lease_token=NULL,lease_until=NULL,updated_at=datetime('now') WHERE id=? AND lease_token=? AND status='running'",
+      )
+      .bind(id, token)
+      .run();
   }
   finishJob(
     id: string,

@@ -1,6 +1,8 @@
-import { beforeAll, afterAll, describe, it, expect } from "vitest";
+import { beforeAll, afterAll, describe, it, expect, vi } from "vitest";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import { readFile, readdir } from "node:fs/promises";
+import { runJob, splitChapter } from "../projects/backend/src/jobs";
+import { analyzeChapter, ProviderError } from "../projects/backend/src/ai";
 import { Repository } from "../projects/database/src/index";
 let mf: Miniflare, repo: Repository;
 beforeAll(async () => {
@@ -10,6 +12,7 @@ beforeAll(async () => {
       script: 'export default {fetch(){return new Response("test")}}',
       compatibilityDate: "2026-10-04",
       d1Databases: ["DB"],
+      r2Buckets: ["BOOKS"],
     }),
   );
   const db = await mf.getD1Database("DB");
@@ -90,4 +93,95 @@ describe("D1 persistence and job ownership", () => {
     expect(await repo.note(id)).toBeNull();
     expect(await repo.analysis(id, 1)).toBeNull();
   });
+});
+
+it("processes a large chapter in resumable sections without losing text or citations", async () => {
+  const pages = Array.from({ length: 5 }, (_, i) => ({
+    page: i + 10,
+    text: "Original sample about safe database retries. ".repeat(600),
+  }));
+  const sections = splitChapter(pages);
+  expect(sections).toHaveLength(3);
+  expect(
+    sections
+      .flat()
+      .map((p) => p.text)
+      .join(""),
+  ).toBe(pages.map((p) => p.text).join(""));
+  expect(
+    sections.every((s) => s.reduce((n, p) => n + p.text.length, 0) <= 65000),
+  ).toBe(true);
+  await repo.createBook(
+    {
+      id: "large",
+      title: "Large",
+      filename: "sample.pdf",
+      page_count: 14,
+      object_key: "pdf",
+      pages_key: "large-pages",
+    },
+    [{ title: "Large chapter", start_page: 10, end_page: 14 }],
+  );
+  const chapter = String((await repo.chapters("large")).results[0].id);
+  await repo.queueJob("large-job", chapter, 1, "test");
+  const bucket = await mf.getR2Bucket("BOOKS");
+  await bucket.put("large-pages", JSON.stringify(pages));
+  const send = vi.fn().mockResolvedValue(undefined);
+  const env = {
+    DB: await mf.getD1Database("DB"),
+    BOOKS: bucket,
+    JOBS: { send },
+    OPENAI_API_KEY: "fixture",
+    OPENAI_MODEL: "test",
+  } as Parameters<typeof runJob>[0];
+  const analyze = vi
+    .fn<typeof analyzeChapter>()
+    .mockImplementation(async (_key, model, _title, source) => ({
+      model,
+      input_tokens: 10,
+      output_tokens: 20,
+      content: {
+        overview: `Section starting at ${source[0].page}`,
+        principles: [
+          {
+            title: "Retries",
+            explanation: "Use identity",
+            application: "Use a key",
+            tradeoff: "Storage",
+            page: source[0].page,
+            evidence: source[0].text.slice(0, 60),
+          },
+        ],
+        questions: ["What if delivery repeats?"],
+      },
+    }));
+  await runJob(env, "large-job", analyze);
+  expect(analyze).toHaveBeenCalledTimes(1);
+  expect(await repo.analysis(chapter, 1)).toBeNull();
+  expect((await repo.analysisParts("large-job", "test")).results).toHaveLength(
+    1,
+  );
+  analyze.mockRejectedValueOnce(new ProviderError("fixture failure"));
+  await runJob(env, "large-job", analyze);
+  expect((await repo.chapter(chapter))?.status).toBe("failed");
+  await repo.queueJob("large-job", chapter, 1, "test");
+  await runJob(env, "large-job", analyze);
+  await runJob(env, "large-job", analyze);
+  expect(analyze).toHaveBeenCalledTimes(4);
+  const result = (await repo.analysis(chapter, 1))!;
+  expect(
+    JSON.parse(result.content).principles.map((p: { page: number }) => p.page),
+  ).toEqual([10, 12, 14]);
+  expect(result.input_tokens).toBe(30);
+  expect(result.output_tokens).toBe(60);
+  await runJob(env, "large-job", analyze);
+  expect(analyze).toHaveBeenCalledTimes(4);
+  expect(
+    (await repo.saveAnalysisPart("large-job", "stale", 0, "test", {})).meta
+      .changes,
+  ).toBe(0);
+  await repo.deleteBook("large");
+  expect((await repo.analysisParts("large-job", "test")).results).toHaveLength(
+    0,
+  );
 });

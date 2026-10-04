@@ -1125,7 +1125,8 @@ function ChapterWorkspace({
               </button>
               <small className="provider-note">
                 Sends this chapter’s extracted text to OpenAI. API usage is
-                billed to your key.
+                billed to your key. Large chapters are analyzed in sections
+                using multiple calls; completed sections are saved for retries.
               </small>
               {running && (
                 <button className="text-link" onClick={analyze}>
@@ -1137,7 +1138,7 @@ function ChapterWorkspace({
             <>
               <div className="analysis-intro">
                 <span className="eyebrow">THE CHAPTER AT A GLANCE</span>
-                <p>{analysis.overview}</p>
+                <p style={{ whiteSpace: "pre-line" }}>{analysis.overview}</p>
               </div>
               <div className="section-heading principle-heading">
                 <h3>Principles to take with you</h3>

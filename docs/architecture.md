@@ -42,9 +42,9 @@ OpenAI is the one external runtime dependency in this version, explicitly select
 3. A separate binary request streams the PDF into R2 through a fixed-length stream, checking its signature and exact byte count without buffering the entire file in Worker memory. Only completed uploads appear in the library. The browser deletes staged records after upload failures; closing the browser mid-upload can leave hidden staging data until manually removed. Failed database creation triggers object cleanup.
 4. The reader checks/corrects the chapter outline before starting analysis.
 5. Analysis creates a unique job for a chapter/version and publishes its ID to the queue. The job record also acts as a dispatch outbox.
-6. The consumer atomically claims work with a lease token, retrieves that chapter's pages from R2, and requests a structured analysis.
+6. The consumer atomically claims work with a lease token and retrieves chapter pages from R2. It splits large chapters into page-preserving sections, processes one unfinished section per queue delivery, saves its result in D1, and queues continuation through the outbox. Retries reuse completed sections for the same model.
 7. The backend splits source pages into labeled excerpts of up to 180 characters. The model selects excerpt IDs; the backend resolves each to its original text and absolute PDF page number, then verifies the stored analysis. Unknown IDs and invalid output are rejected with distinct errors. This verifies citation provenance, not whether every interpretation is correct.
-8. An atomic D1 batch writes the result and marks the job ready, conditional on the worker still holding the lease.
+8. Once every section is complete, the backend joins section summaries, principles, and questions in source order and sums token usage. This is a section-by-section analysis, not an additional AI synthesis across sections. An atomic D1 batch writes the result and marks the job ready, conditional on the worker still holding the lease.
 9. The UI polls status; results, notes, and saved principles remain available after reloads and restarts.
 
 PDF extraction is client-side to keep the first runtime simple. Before supporting untrusted multi-user uploads, decide whether server-side re-extraction is necessary to establish that submitted text corresponds to the uploaded PDF. Scans and diagrams are not OCR'd; users can open the original PDF.
@@ -70,7 +70,7 @@ There is no D1/R2/Queue cross-service transaction. R2 deletion precedes deleting
 
 This prototype accepts only localhost requests. Mutations require a same-origin header. The development server binds to 127.0.0.1. These are local-development guards, not authentication or a multi-user authorization system. Never expose this build through a public tunnel.
 
-Limits: 100 MB PDFs, 600 pages, 3 million extracted characters per book, 30,000 per page, 65,000 per analyzed chapter, 100 chapter ranges, 20,000-character notes, and bounded model output. The UI states when a request sends chapter text to OpenAI. No AI call happens automatically on upload.
+Limits: 100 MB PDFs, 600 pages, 3 million extracted characters per book, 30,000 per page, 65,000 per AI request (large chapters are automatically sectioned), 100 chapter ranges, 20,000-character notes, and bounded model output. The UI states when a request sends chapter text to OpenAI. No AI call happens automatically on upload.
 
 ## Later Cloudflare capabilities
 
