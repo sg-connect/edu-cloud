@@ -46,6 +46,12 @@ Saving is local. Analysis sends the case and selected learning context to OpenAI
 
 Cases allow 24,000 characters of context and 12,000 for a proposed solution. Each saved revision, completed review, and failed review is retained in **Learning history**, including the context and proposed approach at that time. Editing marks the previous report stale without removing it. Analyze again to review the revised case or refresh its learning sources. Queue processing survives navigation; interrupted reviews can be retried. Source snippets are saved with the report, so deleting a book does not erase earlier work-case references (chapter links then become unavailable). Deleting a case explicitly removes its entire history. Existing cases and their latest reports are imported into history; versions overwritten before this feature cannot be reconstructed.
 
+## Analyzed chapters and appearance
+
+**Analyzed** gathers completed chapters from every book in one table. Search by chapter/book or filter to a book, see extracted and saved principle counts, then choose **Review & save** to open the chapter reader and save principles to a track. **Back to analyzed** returns to the collection.
+
+The sun/moon button in the top bar switches light and dark themes. The first visit follows your system preference; an explicit choice is saved in your browser and shared across tabs.
+
 ## Available now
 
 - PDF import, bookmark/heading-based chapter discovery, and editable page ranges.

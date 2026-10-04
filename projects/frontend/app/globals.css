@@ -1751,3 +1751,345 @@ main {
   margin: 4px 0;
   text-align: left;
 }
+
+:root {
+  color-scheme: light;
+}
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.theme-toggle {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid #dce2d5;
+  border-radius: 50%;
+  color: #42523b;
+}
+.analyzed-filters {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 24px 0;
+}
+.analyzed-filters .search {
+  flex: 1;
+  min-width: 180px;
+}
+.analyzed-book-filter {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.analyzed-book-filter select {
+  border: 1px solid #dce2d5;
+  border-radius: 8px;
+  padding: 10px;
+  background: #fff;
+  max-width: 250px;
+}
+.analyzed-table-wrap {
+  border: 1px solid #e1e7d8;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #fff;
+}
+.analyzed-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+.analyzed-table th {
+  background: #f0f4e9;
+  font-size: 12px;
+  font-weight: 600;
+}
+.analyzed-table th,
+.analyzed-table td {
+  padding: 18px;
+  border-bottom: 1px solid #e1e7d8;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+.analyzed-table tr:last-child td {
+  border-bottom: 0;
+}
+.analyzed-table small {
+  display: block;
+  font-size: 12px;
+  color: #6a756d;
+  margin-top: 6px;
+}
+.analyzed-table .text-link {
+  white-space: nowrap;
+}
+@media (max-width: 760px) {
+  .analyzed-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .analyzed-table,
+  .analyzed-table tbody,
+  .analyzed-table tr,
+  .analyzed-table td {
+    display: block;
+  }
+  .analyzed-table tr {
+    padding: 12px;
+    border-bottom: 1px solid #e1e7d8;
+  }
+  .analyzed-table td {
+    padding: 8px;
+    border: 0;
+  }
+  .analyzed-table td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 11px;
+    color: #6a756d;
+    margin-bottom: 4px;
+  }
+  .analyzed-book-filter {
+    max-width: 100%;
+  }
+  .analyzed-book-filter select {
+    max-width: 230px;
+  }
+}
+html[data-theme="dark"] {
+  color-scheme: dark;
+  background: #111a16;
+  color: #e1eae3;
+}
+html[data-theme="dark"]
+  :is(
+    .sidebar,
+    .outline-panel,
+    .analysis-intro,
+    .reflection,
+    .analyzed-table th
+  ) {
+  background: #1c2921;
+}
+html[data-theme="dark"]
+  :is(
+    .topbar,
+    .search,
+    .upload-zone,
+    .book-card,
+    .reader-content,
+    .track-card,
+    .saved-card,
+    .modal,
+    .case-form,
+    .case-report,
+    .case-list-item,
+    .analyzed-table-wrap
+  ) {
+  background: #17221c;
+}
+html[data-theme="dark"]
+  :is(
+    .secondary,
+    .save-destination select,
+    .notes-panel textarea,
+    .outline-row input,
+    .field-label input,
+    .case-form input,
+    .case-form textarea,
+    .analyzed-book-filter select
+  ) {
+  background: #111b15;
+  color: #dae6dc;
+  border-color: #405345;
+}
+html[data-theme="dark"]
+  :is(
+    .nav-item.active,
+    .nav-item:hover,
+    .chapter-link.selected,
+    .secondary:hover,
+    .icon-button:hover,
+    .add-card:hover
+  ) {
+  background: #304333;
+  color: #e1eedf;
+}
+html[data-theme="dark"]
+  :is(
+    .nav-count,
+    .avatar,
+    .count-pill,
+    .upload-icon,
+    .empty-icon,
+    .book-progress,
+    .tag,
+    .principle-card blockquote,
+    .case-source blockquote
+  ) {
+  background: #2b3b2d;
+  color: #c5d7bc;
+}
+html[data-theme="dark"]
+  :is(
+    .workspace-label,
+    .nav-item,
+    .sidebar-note,
+    .sidebar-note h4,
+    .local-profile small,
+    .breadcrumb,
+    .breadcrumb span,
+    .local-chip,
+    .eyebrow,
+    .page-heading h1 span,
+    .page-heading p,
+    .search,
+    .search input::placeholder,
+    .upload-zone p,
+    .upload-zone small,
+    .how-it-works p,
+    .footer,
+    .book-type,
+    .book-card-footer,
+    .icon-button,
+    .add-card,
+    .back-link,
+    .muted,
+    .chapter-link small,
+    .chapter-number,
+    .reader-heading p,
+    .reader-tabs button,
+    .empty p,
+    .provider-note,
+    .analysis-intro p,
+    .save-destination,
+    .principle-index,
+    .principle-card > p,
+    .principle-card details p,
+    .principle-card summary span,
+    .reflection,
+    .reflection h3,
+    .reflection p,
+    .analysis-meta,
+    .source-pages article p,
+    .track-card > p,
+    .track-empty,
+    .track-item small,
+    .saved-card > p,
+    .progress-banner span,
+    .loading,
+    .outline-row > span,
+    .field-label,
+    .case-hint,
+    .case-form small,
+    .case-list-item span,
+    .analyzed-table small
+  ) {
+  color: #aebfad;
+}
+html[data-theme="dark"]
+  :is(
+    .text-link,
+    .case-refs a,
+    .case-notice,
+    .principle-card summary,
+    .principle-card blockquote a,
+    .reader-tabs button[aria-selected="true"]
+  ) {
+  color: #a4cc91;
+}
+html[data-theme="dark"]
+  :is(
+    .sidebar,
+    .sidebar-note,
+    .local-profile,
+    .topbar,
+    .local-chip,
+    .search,
+    .upload-zone,
+    .how-it-works,
+    .footer,
+    .book-card,
+    .add-card,
+    .outline-panel,
+    .reader-content,
+    .reader-tabs,
+    .analysis-intro,
+    .principle-card,
+    .principle-card details,
+    .source-pages article,
+    .track-card,
+    .track-empty,
+    .track-item,
+    .saved-card,
+    .outline-row input,
+    .field-label input,
+    .case-form,
+    .case-report,
+    .case-list-item,
+    .case-source,
+    .analyzed-table-wrap,
+    .analyzed-table th,
+    .analyzed-table td,
+    .analyzed-table tr,
+    .theme-toggle
+  ) {
+  border-color: #354639;
+}
+html[data-theme="dark"] .theme-toggle {
+  color: #d4e4cd;
+}
+html[data-theme="dark"] .primary {
+  background: #a8c495;
+  border-color: #a8c495;
+  color: #172819;
+}
+html[data-theme="dark"] .primary:hover {
+  background: #bdd5ad;
+}
+html[data-theme="dark"] .hero {
+  background: #20402e;
+}
+html[data-theme="dark"] .color-0 {
+  background: #344933;
+  color: #e2ebcd;
+}
+html[data-theme="dark"] .color-1 {
+  background: #4c3f2d;
+  color: #eddfc5;
+}
+html[data-theme="dark"] .color-2 {
+  background: #2c444b;
+  color: #d4e9ed;
+}
+html[data-theme="dark"] .color-3 {
+  background: #44354c;
+  color: #e9dbef;
+}
+html[data-theme="dark"] .alert {
+  background: #382b20;
+  border-color: #705136;
+  color: #f2cba3;
+}
+html[data-theme="dark"] .alert.subtle {
+  background: #29351e;
+  border-color: #485738;
+  color: #ccd7b1;
+}
+html[data-theme="dark"] .error-text {
+  color: #efb793 !important;
+}
+html[data-theme="dark"] .progress-banner {
+  background: #2b3b24;
+  color: #d1e5bd;
+}
+html[data-theme="dark"] .analyzed-table td[data-label]::before {
+  color: #aebfad;
+}

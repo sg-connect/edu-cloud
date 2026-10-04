@@ -337,3 +337,78 @@ it("retains saved approaches and every completed review as immutable learning hi
   await cases.delete("history-case");
   expect((await cases.history("history-case")).results).toHaveLength(0);
 });
+
+it("lists completed current chapters across books and saves principles beyond the eighth", async () => {
+  const db = await mf.getD1Database("DB");
+  for (const id of ["index-a", "index-b", "index-unread"]) {
+    await repo.createBook(
+      {
+        id,
+        title: id,
+        filename: "sample.pdf",
+        page_count: 2,
+        object_key: "pdf",
+        pages_key: "pages",
+      },
+      [{ title: `Chapter ${id}`, start_page: 1, end_page: 2 }],
+    );
+  }
+  const principles = Array.from({ length: 10 }, (_, i) => ({
+    title: `Principle ${i + 1}`,
+    explanation: "Use stable identity",
+    application: "Database uniqueness",
+    tradeoff: "Storage",
+    page: 1,
+    evidence: "A unique constraint protects against races.",
+  }));
+  for (const id of ["index-a", "index-b"]) {
+    const c = String((await repo.chapters(id)).results[0].id);
+    await repo.queueJob(id, c, 1, "fixture");
+    await repo.claim(id, "token");
+    await repo.finishJob(id, "token", {
+      model: "fixture",
+      input_tokens: 1,
+      output_tokens: 1,
+      content: { overview: "Retries", principles, questions: [] },
+    });
+  }
+  const rows = (await repo.analyzedChapters()).results.filter((r) =>
+    String(r.book_id).startsWith("index-"),
+  );
+  expect(rows).toHaveLength(2);
+  expect(rows.every((r) => r.principle_count === 10)).toBe(true);
+  const c = String(rows.find((r) => r.book_id === "index-a")!.id);
+  const env = { DB: db, APP_MODE: "local" } as BackendEnv;
+  const saved = await handleApi(
+    new Request("http://localhost:3400/api/tracks/reliability/items", {
+      method: "POST",
+      headers: {
+        origin: "http://localhost:3400",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ chapterId: c, principleIndex: 8 }),
+    }),
+    env,
+  );
+  expect(saved.status).toBe(200);
+  expect(
+    (await repo.analyzedChapters()).results.find((r) => r.id === c)
+      ?.saved_count,
+  ).toBe(1);
+  const response = await handleApi(
+    new Request("http://localhost:3400/api/analyzed"),
+    env,
+  );
+  expect(response.status).toBe(200);
+  await db.prepare("UPDATE chapters SET version=2 WHERE id=?").bind(c).run();
+  expect((await repo.analyzedChapters()).results.some((r) => r.id === c)).toBe(
+    false,
+  );
+  for (const id of ["index-a", "index-b", "index-unread"])
+    await repo.deleteBook(id);
+  expect(
+    (await repo.analyzedChapters()).results.some((r) =>
+      String(r.book_id).startsWith("index-"),
+    ),
+  ).toBe(false);
+});

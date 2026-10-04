@@ -31,6 +31,8 @@ import type {
   ChapterInput,
   Track,
 } from "@edu/contracts";
+import Analyzed from "./analyzed";
+import ThemeToggle from "./theme";
 import WorkCases from "./work-cases";
 import { extractPdf } from "./pdf";
 
@@ -74,9 +76,9 @@ function Empty({
 }
 
 export default function Workspace() {
-  const [view, setView] = useState<"library" | "tracks" | "notebook" | "cases">(
-    "library",
-  );
+  const [view, setView] = useState<
+    "library" | "tracks" | "notebook" | "cases" | "analyzed"
+  >("library");
   const [books, setBooks] = useState<Book[]>([]),
     [tracks, setTracks] = useState<Track[]>([]),
     [loading, setLoading] = useState(true);
@@ -263,6 +265,13 @@ export default function Workspace() {
             My library<span className="nav-count">{books.length}</span>
           </button>
           <button
+            className={view === "analyzed" ? "nav-item active" : "nav-item"}
+            onClick={() => navigate("analyzed")}
+          >
+            <CheckCircle2 size={19} />
+            Analyzed
+          </button>
+          <button
             className={view === "tracks" ? "nav-item active" : "nav-item"}
             onClick={() => navigate("tracks")}
           >
@@ -313,13 +322,18 @@ export default function Workspace() {
                     ? "Learning tracks"
                     : view === "cases"
                       ? "Practice cases"
-                      : "My principles"}
+                      : view === "analyzed"
+                        ? "Analyzed"
+                        : "My principles"}
             </span>
           </div>
-          <span className="local-chip">
-            <Cloud size={15} />
-            Local workspace
-          </span>
+          <div className="topbar-actions">
+            <ThemeToggle />
+            <span className="local-chip">
+              <Cloud size={15} />
+              Local workspace
+            </span>
+          </div>
         </header>
         <main>
           {error && (
@@ -353,7 +367,7 @@ export default function Workspace() {
                 }}
               >
                 <ArrowLeft size={16} />
-                Back to library
+                {view === "analyzed" ? "Back to analyzed" : "Back to library"}
               </button>
               <div className="page-heading compact">
                 <div>
@@ -438,6 +452,14 @@ export default function Workspace() {
               <Spinner />
               Opening book…
             </div>
+          ) : view === "analyzed" ? (
+            <Analyzed
+              onOpen={(bookId, chapterId) => {
+                setBookId(bookId);
+                setChapterId(chapterId);
+              }}
+              onLibrary={() => navigate("library")}
+            />
           ) : view === "cases" ? (
             <WorkCases
               configured={Boolean(status?.aiConfigured)}

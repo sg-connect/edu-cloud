@@ -41,6 +41,18 @@ export class Repository {
       .bind(id)
       .first<StoredChapter>();
   }
+  analyzedChapters() {
+    return this.db
+      .prepare(
+        `SELECT c.id,c.book_id,c.title,b.title book_title,c.start_page,c.end_page,
+      a.created_at analyzed_at,json_array_length(a.content,'$.principles') principle_count,
+      (SELECT COUNT(DISTINCT t.title) FROM track_items t WHERE t.chapter_id=c.id) saved_count
+      FROM analyses a JOIN chapters c ON c.id=a.chapter_id AND c.version=a.chapter_version
+      JOIN books b ON b.id=c.book_id WHERE b.upload_status='ready'
+      ORDER BY a.created_at DESC,b.title,c.position`,
+      )
+      .all();
+  }
   listBooks() {
     return this.db
       .prepare(

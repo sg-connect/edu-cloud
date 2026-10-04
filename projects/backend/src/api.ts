@@ -168,6 +168,8 @@ export async function handleApi(
         return json({ ok: true }, 202);
       }
     }
+    if (resource === "analyzed" && !id && method === "GET")
+      return json((await repo.analyzedChapters()).results);
     if (resource === "status" && method === "GET")
       return json({
         aiConfigured: Boolean(env.OPENAI_API_KEY),
@@ -446,7 +448,7 @@ export async function handleApi(
       const input = z
         .object({
           chapterId: z.string(),
-          principleIndex: z.number().int().min(0).max(7),
+          principleIndex: z.number().int().min(0),
         })
         .parse(await bodyJson(request));
       const track = await repo.track(id);
