@@ -8,6 +8,8 @@ TypeScript is pinned to 5.9.3 because the installed Nx dependency analyzer expec
 
 The first dev start creates the original sample PDF and applies migrations. Start from the root of this repository so the root environment file and persistent storage paths are consistent.
 
+If an API error still shows text removed from the source, stop and restart `npm run dev`. The running auxiliary backend Worker can retain older code while frontend hot reload continues. Restarting also applies pending D1 migrations; it preserves `.wrangler/state/`. Refresh the browser afterward.
+
 ## Commands and ownership
 
 - `nx run frontend:dev`: start the integrated local frontend and backend Workers.
