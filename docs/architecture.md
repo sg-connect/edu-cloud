@@ -43,7 +43,7 @@ OpenAI is the one external runtime dependency in this version, explicitly select
 4. The reader checks/corrects the chapter outline before starting analysis.
 5. Analysis creates a unique job for a chapter/version and publishes its ID to the queue. The job record also acts as a dispatch outbox.
 6. The consumer atomically claims work with a lease token, retrieves that chapter's pages from R2, and requests a structured analysis.
-7. Returned evidence excerpts must occur on the cited source pages. Invalid output is not saved as a successful analysis.
+7. The backend splits source pages into labeled excerpts of up to 180 characters. The model selects excerpt IDs; the backend resolves each to its original text and absolute PDF page number, then verifies the stored analysis. Unknown IDs and invalid output are rejected with distinct errors. This verifies citation provenance, not whether every interpretation is correct.
 8. An atomic D1 batch writes the result and marks the job ready, conditional on the worker still holding the lease.
 9. The UI polls status; results, notes, and saved principles remain available after reloads and restarts.
 

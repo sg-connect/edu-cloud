@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { guardLocal } from "../projects/backend/src/api";
-import { analyzeChapter } from "../projects/backend/src/ai";
+import { analyzeChapter, sourceExcerpts } from "../projects/backend/src/ai";
 import {
   validateEvidence,
   validateChapters,
@@ -47,6 +47,18 @@ describe("source-grounded analysis", () => {
       ),
     ).toThrow();
   });
+  it("preserves exact PDF typography and absolute page numbers in bounded excerpts", () => {
+    const text =
+      "A ligature ﬁ, curly ‘quotes’, and hyphen-\nated PDF text. ".repeat(20);
+    const excerpts = sourceExcerpts([{ page: 42, text }]);
+    expect(excerpts.length).toBeGreaterThan(1);
+    expect(new Set(excerpts.map((e) => e.id)).size).toBe(excerpts.length);
+    for (const excerpt of excerpts) {
+      expect(excerpt.page).toBe(42);
+      expect(excerpt.text.length).toBeLessThanOrEqual(180);
+      expect(text.includes(excerpt.text)).toBe(true);
+    }
+  });
   it("rejects overlapping chapter ranges", () => {
     expect(() =>
       validateChapters(
@@ -59,17 +71,27 @@ describe("source-grounded analysis", () => {
     ).toThrow();
   });
   it("uses structured outputs, disables response storage, and validates the response", async () => {
-    const fetcher = vi
-      .fn<typeof fetch>()
-      .mockResolvedValue(
-        Response.json({
-          status: "completed",
-          output: [
-            { content: [{ type: "output_text", text: JSON.stringify(valid) }] },
-          ],
-          usage: { input_tokens: 100, output_tokens: 80 },
-        }),
-      );
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json({
+        status: "completed",
+        output: [
+          {
+            content: [
+              {
+                type: "output_text",
+                text: JSON.stringify({
+                  ...valid,
+                  principles: valid.principles.map(
+                    ({ page, evidence, ...p }) => ({ ...p, source_id: "p1e1" }),
+                  ),
+                }),
+              },
+            ],
+          },
+        ],
+        usage: { input_tokens: 100, output_tokens: 80 },
+      }),
+    );
     const result = await analyzeChapter(
       "fixture-key",
       "fixture-model",
@@ -77,7 +99,10 @@ describe("source-grounded analysis", () => {
       pages,
       fetcher,
     );
-    expect(result.content).toEqual(valid);
+    expect(result.content).toEqual({
+      ...valid,
+      principles: [{ ...valid.principles[0], evidence: pages[0].text }],
+    });
     const body = JSON.parse(String(fetcher.mock.calls[0][1]?.body));
     expect(body.store).toBe(false);
     expect(body.text.format.strict).toBe(true);
@@ -103,26 +128,24 @@ describe("source-grounded analysis", () => {
     await expect(
       analyzeChapter("key", "model", "title", pages, incomplete),
     ).rejects.toThrow("did not finish");
-    const bad = vi
-      .fn<typeof fetch>()
-      .mockResolvedValue(
-        Response.json({
-          status: "completed",
-          output: [
-            {
-              content: [
-                {
-                  type: "output_text",
-                  text: JSON.stringify({
-                    ...valid,
-                    principles: [{ ...valid.principles[0], page: 99 }],
-                  }),
-                },
-              ],
-            },
-          ],
-        }),
-      );
+    const bad = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json({
+        status: "completed",
+        output: [
+          {
+            content: [
+              {
+                type: "output_text",
+                text: JSON.stringify({
+                  ...valid,
+                  principles: [{ ...valid.principles[0], source_id: "p99e1" }],
+                }),
+              },
+            ],
+          },
+        ],
+      }),
+    );
     await expect(
       analyzeChapter("key", "model", "title", pages, bad),
     ).rejects.toThrow("citations");
