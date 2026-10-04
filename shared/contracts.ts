@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-export const MAX_PDF_BYTES = 20 * 1024 * 1024;
+export const MAX_PDF_MB = 100;
+export const MAX_PDF_BYTES = MAX_PDF_MB * 1024 * 1024;
+export function pdfSizeError(bytes: number) {
+  return `This PDF is ${(bytes / (1024 * 1024)).toFixed(1)} MB. The current upload limit is ${MAX_PDF_MB} MB.`;
+}
 export const MAX_PAGES = 600;
 export const MAX_CHAPTER_CHARS = 65000;
 export const pageSchema = z.object({

@@ -1,5 +1,6 @@
 import {
   MAX_PDF_BYTES,
+  pdfSizeError,
   MAX_PAGES,
   type ChapterInput,
   type PageText,
@@ -8,7 +9,7 @@ export async function extractPdf(
   file: File,
   onProgress: (message: string) => void,
 ) {
-  if (file.size > MAX_PDF_BYTES) throw new Error("Choose a PDF up to 20 MB.");
+  if (file.size > MAX_PDF_BYTES) throw new Error(pdfSizeError(file.size));
   const pdfjs = await import("pdfjs-dist");
   const { default: workerUrl } =
     await import("pdfjs-dist/build/pdf.worker.min.mjs?url");

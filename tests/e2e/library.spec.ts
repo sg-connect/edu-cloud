@@ -17,7 +17,10 @@ test("PDF import, chapter outline, source, notes and tracks persist", async ({
     await page.locator("input[type=file]").setInputFiles({
       name: `${title}.pdf`,
       mimeType: "application/pdf",
-      buffer: await readFile("projects/frontend/public/sample.pdf"),
+      buffer: largePdf(
+        await readFile("projects/frontend/public/sample.pdf"),
+        25 * 1024 * 1024,
+      ),
     });
     await expect(page.getByRole("heading", { name: title })).toBeVisible();
     await expect(
@@ -74,4 +77,74 @@ test("mobile library has no horizontal overflow", async ({ page }) => {
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
+});
+
+function largePdf(sample: Buffer, size: number) {
+  const tail = sample.subarray(sample.lastIndexOf("startxref"));
+  return Buffer.concat([
+    sample,
+    Buffer.alloc(size - sample.length - tail.length, 32),
+    tail,
+  ]);
+}
+
+test("100 MB streaming upload and size validation", async ({ request }) => {
+  test.setTimeout(120000);
+  const headers = { origin: "http://127.0.0.1:3400" };
+  const max = 100 * 1024 * 1024;
+  const metadata = {
+    title: `E2E large ${Date.now()}`,
+    filename: "large.pdf",
+    byte_count: max,
+    pages: [
+      {
+        page: 1,
+        text: "Original engineering sample. Retries must preserve job identity and avoid duplicating side effects. ",
+      },
+    ],
+    chapters: [{ title: "Retries", start_page: 1, end_page: 1 }],
+  };
+  const oversize = await request.post("/api/books", {
+    headers,
+    data: { ...metadata, byte_count: max + 1 },
+  });
+  expect(oversize.status()).toBe(413);
+  expect((await oversize.json()).error).toContain("100 MB");
+  const staged = await request.post("/api/books", { headers, data: metadata });
+  expect(staged.status()).toBe(201);
+  const { id } = await staged.json();
+  try {
+    expect(
+      (await (await request.get("/api/books")).json()).some(
+        (b: { id: string }) => b.id === id,
+      ),
+    ).toBe(false);
+    const bad = await request.put(`/api/books/${id}/pdf`, {
+      headers,
+      data: Buffer.from("invalid"),
+    });
+    expect(bad.status()).toBe(400);
+    const pdf = largePdf(
+      await readFile("projects/frontend/public/sample.pdf"),
+      max,
+    );
+    const uploaded = await request.put(`/api/books/${id}/pdf`, {
+      headers: { ...headers, "content-type": "application/pdf" },
+      data: pdf,
+      timeout: 90000,
+    });
+    expect(uploaded.status(), await uploaded.text()).toBe(200);
+    expect(
+      (await (await request.get("/api/books")).json()).some(
+        (b: { id: string }) => b.id === id,
+      ),
+    ).toBe(true);
+    const stored = await fetch(`http://127.0.0.1:3400/api/books/${id}/pdf`);
+    expect(stored.status).toBe(200);
+    let bytes = 0;
+    for await (const chunk of stored.body!) bytes += chunk.byteLength;
+    expect(bytes).toBe(max);
+  } finally {
+    await request.delete(`/api/books/${id}`, { headers });
+  }
 });

@@ -155,13 +155,30 @@ export default function Workspace() {
     try {
       const metadata = await extractPdf(file, setProgress);
       setProgress("Saving your book…");
-      const form = new FormData();
-      form.set("file", file);
-      form.set("metadata", JSON.stringify(metadata));
-      const result = await api<{ id: string }>("books", {
-        method: "POST",
-        body: form,
-      });
+      const result = await api<{ id: string }>(
+        "books",
+        send("POST", {
+          ...metadata,
+          filename: file.name.slice(0, 200),
+          byte_count: file.size,
+        }),
+      );
+      try {
+        const uploaded = await fetch(`/api/books/${result.id}/pdf`, {
+          method: "PUT",
+          headers: { "content-type": "application/pdf" },
+          body: file,
+        });
+        if (!uploaded.ok) {
+          const failure = (await uploaded.json()) as { error?: string };
+          throw new Error(
+            failure.error || "PDF upload failed. Please try again.",
+          );
+        }
+      } catch (error) {
+        await api(`books/${result.id}`, send("DELETE")).catch(() => {});
+        throw error;
+      }
       await refresh();
       setBookId(result.id);
       setView("library");
@@ -528,7 +545,7 @@ export default function Workspace() {
                     <ArrowRight size={15} />
                   </button>
                   <small>
-                    Text-based PDFs · Up to 20 MB · Stored privately on this
+                    Text-based PDFs · Up to 100 MB · Stored privately on this
                     computer
                   </small>
                 </div>

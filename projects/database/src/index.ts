@@ -5,6 +5,8 @@ export interface StoredBook {
   page_count: number;
   object_key: string;
   pages_key: string;
+  upload_status: string;
+  byte_count: number;
 }
 export interface StoredChapter {
   id: string;
@@ -42,7 +44,7 @@ export class Repository {
   listBooks() {
     return this.db
       .prepare(
-        "SELECT b.*, (SELECT COUNT(*) FROM chapters c WHERE c.book_id=b.id) chapter_count, (SELECT COUNT(*) FROM chapters c JOIN analyses a ON a.chapter_id=c.id AND a.chapter_version=c.version WHERE c.book_id=b.id) analyzed_count FROM books b ORDER BY b.created_at DESC",
+        "SELECT b.*, (SELECT COUNT(*) FROM chapters c WHERE c.book_id=b.id) chapter_count, (SELECT COUNT(*) FROM chapters c JOIN analyses a ON a.chapter_id=c.id AND a.chapter_version=c.version WHERE c.book_id=b.id) analyzed_count FROM books b WHERE b.upload_status='ready' ORDER BY b.created_at DESC",
       )
       .all();
   }
@@ -55,13 +57,17 @@ export class Repository {
       .all();
   }
   createBook(
-    book: StoredBook & { filename: string },
+    book: Omit<StoredBook, "upload_status" | "byte_count"> & {
+      filename: string;
+      upload_status?: string;
+      byte_count?: number;
+    },
     chapters: ChapterInput[],
   ) {
     return this.db.batch([
       this.db
         .prepare(
-          "INSERT INTO books(id,title,filename,page_count,object_key,pages_key) VALUES(?,?,?,?,?,?)",
+          "INSERT INTO books(id,title,filename,page_count,object_key,pages_key,upload_status,byte_count) VALUES(?,?,?,?,?,?,?,?)",
         )
         .bind(
           book.id,
@@ -70,6 +76,8 @@ export class Repository {
           book.page_count,
           book.object_key,
           book.pages_key,
+          book.upload_status ?? "ready",
+          book.byte_count ?? 0,
         ),
       ...this.chapterStatements(book.id, chapters),
     ]);
@@ -104,6 +112,14 @@ export class Repository {
       this.db.prepare("DELETE FROM chapters WHERE book_id=?").bind(id),
       ...this.chapterStatements(id, chapters),
     ]);
+  }
+  finishUpload(id: string) {
+    return this.db
+      .prepare(
+        "UPDATE books SET upload_status='ready' WHERE id=? AND upload_status='uploading'",
+      )
+      .bind(id)
+      .run();
   }
   deleteBook(id: string) {
     return this.db.prepare("DELETE FROM books WHERE id=?").bind(id).run();

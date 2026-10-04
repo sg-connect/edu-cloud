@@ -2,6 +2,8 @@ import { Repository } from "@edu/database";
 import { z, ZodError } from "zod";
 import {
   MAX_PDF_BYTES,
+  MAX_PDF_MB,
+  pdfSizeError,
   MAX_CHAPTER_CHARS,
   uploadSchema,
   chapterInput,
@@ -89,6 +91,8 @@ async function getChapter(env: BackendEnv, id: string) {
 }
 async function readPages(env: BackendEnv, bookId: string) {
   const book = await getBook(env, bookId);
+  if (book.upload_status !== "ready")
+    throw new HttpError(409, "The PDF has not finished uploading.");
   const object = await env.BOOKS.get(book.pages_key);
   if (!object) throw new HttpError(404, "Extracted pages are missing.");
   return object.json<PageText[]>();
@@ -111,35 +115,33 @@ export async function handleApi(
         aiConfigured: Boolean(env.OPENAI_API_KEY),
         model: env.OPENAI_MODEL || "gpt-5.6-luna",
         mode: "local",
-        maxPdfMB: 20,
+        maxPdfMB: MAX_PDF_MB,
       });
     if (resource === "books" && !id && method === "GET") {
       const result = await repo.listBooks();
       return json(result.results);
     }
     if (resource === "books" && !id && method === "POST") {
-      const raw = await boundedBody(request, MAX_PDF_BYTES + 6500000);
-      const form = await new Response(raw, {
-        headers: { "content-type": request.headers.get("content-type") || "" },
-      }).formData();
-      const file = form.get("file");
-      if (!(file instanceof File) || file.size > MAX_PDF_BYTES || file.size < 5)
-        throw new HttpError(400, "Choose a PDF up to 20 MB.");
-      const prefix = new TextDecoder().decode(
-        await file.slice(0, 5).arrayBuffer(),
-      );
-      if (prefix !== "%PDF-")
-        throw new HttpError(400, "The uploaded file is not a PDF.");
-      const metadata = form.get("metadata");
-      if (typeof metadata !== "string" || metadata.length > 6000000)
-        throw new HttpError(400, "Invalid PDF metadata.");
       let parsed: unknown;
       try {
-        parsed = JSON.parse(metadata);
-      } catch {
-        throw new HttpError(400, "Invalid PDF metadata.");
+        parsed = JSON.parse(
+          new TextDecoder().decode(await boundedBody(request, 6500000)),
+        );
+      } catch (error) {
+        if (error instanceof HttpError) throw error;
+        throw new HttpError(
+          400,
+          "Invalid book metadata. Refresh the page and try again.",
+        );
       }
-      const data = uploadSchema.parse(parsed);
+      const data = uploadSchema
+        .extend({
+          filename: z.string().min(1).max(200),
+          byte_count: z.number().int().min(5),
+        })
+        .parse(parsed);
+      if (data.byte_count > MAX_PDF_BYTES)
+        throw new HttpError(413, pdfSizeError(data.byte_count));
       if (data.pages.some((p, i) => p.page !== i + 1))
         throw new HttpError(400, "PDF pages must be sequential.");
       if (data.pages.reduce((n, p) => n + p.text.length, 0) > 3000000)
@@ -157,9 +159,6 @@ export async function handleApi(
         objectKey = `books/${bookId}/source.pdf`,
         pagesKey = `books/${bookId}/pages.json`;
       try {
-        await env.BOOKS.put(objectKey, file.stream(), {
-          httpMetadata: { contentType: "application/pdf" },
-        });
         await env.BOOKS.put(pagesKey, JSON.stringify(data.pages), {
           httpMetadata: { contentType: "application/json" },
         });
@@ -167,7 +166,9 @@ export async function handleApi(
           {
             id: bookId,
             title: data.title,
-            filename: file.name.slice(0, 200),
+            filename: data.filename,
+            byte_count: data.byte_count,
+            upload_status: "uploading",
             page_count: data.pages.length,
             object_key: objectKey,
             pages_key: pagesKey,
@@ -179,6 +180,81 @@ export async function handleApi(
         throw e;
       }
       return json({ id: bookId }, 201);
+    }
+    if (resource === "books" && id && action === "pdf" && method === "PUT") {
+      const book = await getBook(env, id);
+      if (book.upload_status !== "uploading")
+        throw new HttpError(409, "This book is already uploaded.");
+      if (book.byte_count > MAX_PDF_BYTES)
+        throw new HttpError(413, pdfSizeError(book.byte_count));
+      if (!request.body)
+        throw new HttpError(400, "The PDF file is missing from the upload.");
+      const stream = new FixedLengthStream(book.byte_count);
+      const writer = stream.writable.getWriter();
+      const reader = request.body.getReader();
+      const copy = async () => {
+        let count = 0;
+        let prefix = "";
+        try {
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            count += value.byteLength;
+            if (count > book.byte_count)
+              throw new HttpError(
+                400,
+                "The PDF size changed during upload. Please try again.",
+              );
+            if (prefix.length < 5) {
+              prefix += new TextDecoder().decode(
+                value.subarray(0, 5 - prefix.length),
+              );
+              if (prefix.length === 5 && prefix !== "%PDF-")
+                throw new HttpError(400, "The uploaded file is not a PDF.");
+            }
+            await writer.write(value);
+          }
+          if (count !== book.byte_count)
+            throw new HttpError(
+              400,
+              "The PDF upload was interrupted. Please try again.",
+            );
+          await writer.close();
+        } catch (error) {
+          await Promise.allSettled([writer.abort(error), reader.cancel(error)]);
+          throw error;
+        }
+      };
+      // Both operations are awaited; only bounded chunks pass through Worker memory.
+      const results = await Promise.allSettled([
+        copy(),
+        env.BOOKS.put(book.object_key, stream.readable, {
+          httpMetadata: { contentType: "application/pdf" },
+        }).catch(async (error) => {
+          await reader.cancel(error).catch(() => {});
+          await writer.abort(error).catch(() => {});
+          throw error;
+        }),
+      ]);
+      const failure = results.find((r) => r.status === "rejected");
+      if (failure?.status === "rejected") {
+        await env.BOOKS.delete(book.object_key);
+        throw failure.reason instanceof HttpError
+          ? failure.reason
+          : new HttpError(
+              400,
+              "The PDF upload did not finish. Please try again.",
+            );
+      }
+      const completed = await repo.finishUpload(id);
+      if (!completed.meta.changes) {
+        await env.BOOKS.delete(book.object_key);
+        throw new HttpError(
+          409,
+          "This upload was removed. Please upload again.",
+        );
+      }
+      return json({ ok: true });
     }
     if (resource === "books" && id && action === "pdf" && method === "GET") {
       const book = await getBook(env, id);

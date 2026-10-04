@@ -38,8 +38,8 @@ OpenAI is the one external runtime dependency in this version, explicitly select
 ## PDF and chapter flow
 
 1. Browser PDF.js extracts page text and proposes chapters from bookmarks or chapter headings. A fallback groups pages and labels them as page ranges.
-2. The backend bounds the request, verifies a PDF signature and metadata shape, and validates page order and chapter ranges.
-3. R2 stores the original PDF and extracted pages. A D1 atomic batch creates book and chapter records. Failed database creation triggers object cleanup.
+2. The backend validates bounded JSON metadata, declared file size, page order, and chapter ranges. Extracted pages go to R2; a D1 batch stages book and chapter records.
+3. A separate binary request streams the PDF into R2 through a fixed-length stream, checking its signature and exact byte count without buffering the entire file in Worker memory. Only completed uploads appear in the library. The browser deletes staged records after upload failures; closing the browser mid-upload can leave hidden staging data until manually removed. Failed database creation triggers object cleanup.
 4. The reader checks/corrects the chapter outline before starting analysis.
 5. Analysis creates a unique job for a chapter/version and publishes its ID to the queue. The job record also acts as a dispatch outbox.
 6. The consumer atomically claims work with a lease token, retrieves that chapter's pages from R2, and requests a structured analysis.
@@ -70,7 +70,7 @@ There is no D1/R2/Queue cross-service transaction. R2 deletion precedes deleting
 
 This prototype accepts only localhost requests. Mutations require a same-origin header. The development server binds to 127.0.0.1. These are local-development guards, not authentication or a multi-user authorization system. Never expose this build through a public tunnel.
 
-Limits: 20 MB PDFs, 600 pages, 3 million extracted characters per book, 30,000 per page, 65,000 per analyzed chapter, 100 chapter ranges, 20,000-character notes, and bounded model output. The UI states when a request sends chapter text to OpenAI. No AI call happens automatically on upload.
+Limits: 100 MB PDFs, 600 pages, 3 million extracted characters per book, 30,000 per page, 65,000 per analyzed chapter, 100 chapter ranges, 20,000-character notes, and bounded model output. The UI states when a request sends chapter text to OpenAI. No AI call happens automatically on upload.
 
 ## Later Cloudflare capabilities
 

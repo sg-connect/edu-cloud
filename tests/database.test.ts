@@ -1,6 +1,6 @@
 import { beforeAll, afterAll, describe, it, expect } from "vitest";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { Repository } from "../projects/database/src/index";
 let mf: Miniflare, repo: Repository;
 beforeAll(async () => {
@@ -13,17 +13,19 @@ beforeAll(async () => {
     }),
   );
   const db = await mf.getD1Database("DB");
-  const schema = await readFile(
-    "projects/database/migrations/0001_library.sql",
-    "utf8",
-  );
-  await db.batch(
-    schema
-      .split(";")
-      .map((s) => s.trim())
-      .filter(Boolean)
-      .map((s) => db.prepare(s)),
-  );
+  for (const file of (await readdir("projects/database/migrations")).sort()) {
+    const schema = await readFile(
+      `projects/database/migrations/${file}`,
+      "utf8",
+    );
+    await db.batch(
+      schema
+        .split(";")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((s) => db.prepare(s)),
+    );
+  }
   repo = new Repository(db);
 });
 afterAll(async () => {
