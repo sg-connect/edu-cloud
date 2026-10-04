@@ -1,4 +1,6 @@
-import { Repository } from "@edu/database";
+import { workCaseInput } from "../../../shared/work-cases";
+import { dispatchCases } from "./work-cases";
+import { Repository, WorkRepository } from "@edu/database";
 import { z, ZodError } from "zod";
 import {
   MAX_PDF_BYTES,
@@ -109,6 +111,54 @@ export async function handleApi(
       .slice(1);
     const [resource, id, action] = parts;
     const method = request.method;
+    if (resource === "work-cases") {
+      const cases = new WorkRepository(env.DB);
+      if (!id && method === "GET") return json((await cases.list()).results);
+      if (!id && method === "POST") {
+        const data = workCaseInput.parse(await bodyJson(request));
+        const caseId = crypto.randomUUID();
+        await cases.create(caseId, data);
+        return json({ id: caseId }, 201);
+      }
+      const current = await cases.get(id);
+      if (!current) throw new HttpError(404, "Work case not found.");
+      if (!action && method === "GET") {
+        return json({
+          ...current,
+          result: current.result ? JSON.parse(current.result) : null,
+        });
+      }
+      if (!action && method === "PUT") {
+        const data = workCaseInput
+          .extend({ revision: z.number().int().positive() })
+          .parse(await bodyJson(request));
+        if (!(await cases.update(id, data.revision, data)).meta.changes)
+          throw new HttpError(
+            409,
+            "This case changed in another tab. Reopen it before saving.",
+          );
+        return json({ ok: true });
+      }
+      if (!action && method === "DELETE") {
+        await cases.delete(id);
+        return json({ ok: true });
+      }
+      if (action === "analyze" && method === "POST") {
+        if (!env.OPENAI_API_KEY)
+          throw new HttpError(503, "Configure OpenAI before reviewing a case.");
+        const { revision } = z
+          .object({ revision: z.number().int().positive() })
+          .parse(await bodyJson(request));
+        if (revision !== current.revision)
+          throw new HttpError(
+            409,
+            "This case changed. Reopen it before analyzing.",
+          );
+        await cases.queue(id, revision, env.OPENAI_MODEL || "gpt-5.6-luna");
+        await dispatchCases(env);
+        return json({ ok: true }, 202);
+      }
+    }
     if (resource === "status" && method === "GET")
       return json({
         aiConfigured: Boolean(env.OPENAI_API_KEY),

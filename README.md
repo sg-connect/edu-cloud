@@ -38,6 +38,14 @@ Browser → frontend Worker → backend Worker → database repository → D1
 
 Small shared contracts live in `shared/`. The frontend has no D1/R2 bindings or SQL. `npm run check:boundaries` checks the architectural boundaries. Development uses Cloudflare's workerd/Miniflare runtime, with persistent local D1, R2, and Queues.
 
+## Work cases
+
+Open **Work cases → New work case**. Paste the task, architecture, stack, code excerpts, team practices, and constraints prepared in your company Claude conversation. Optionally describe your proposed solution. Save the case, then choose **Analyze work case** for an approach, risks, questions, and a critique with a revised proposal.
+
+Saving is local. Analysis sends the case and selected learning context to OpenAI with `store: false`, using your configured key. The app scans all completed chapter analyses, extracted principles, and personal chapter notes, prioritizes relevant entries with keyword matching, and sends up to 24 entries within a 48,000-character source budget. Saved principles receive a ranking boost. Reports show searched/selected counts and link sources back to their chapters. Unanalyzed PDF text is not searched; this first version does not use semantic/vector retrieval. Advice without references is labeled general engineering guidance.
+
+Cases allow 24,000 characters of context and 12,000 for a proposed solution. Editing preserves the previous report but marks it stale. Analyze again to review the revised case or refresh its learning sources. Queue processing survives navigation; interrupted reviews can be retried. Source snippets are saved with the report, so deleting a book does not erase earlier work-case references (chapter links then become unavailable). Delete the case to remove that report.
+
 ## Available now
 
 - PDF import, bookmark/heading-based chapter discovery, and editable page ranges.

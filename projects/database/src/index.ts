@@ -322,3 +322,5 @@ export class Repository {
       .run();
   }
 }
+
+export { WorkRepository } from "./work-cases";

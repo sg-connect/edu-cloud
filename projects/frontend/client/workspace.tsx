@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
+  BriefcaseBusiness,
   ArrowLeft,
   ArrowRight,
   BookOpen,
@@ -30,6 +31,7 @@ import type {
   ChapterInput,
   Track,
 } from "@edu/contracts";
+import WorkCases from "./work-cases";
 import { extractPdf } from "./pdf";
 
 async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -72,7 +74,7 @@ function Empty({
 }
 
 export default function Workspace() {
-  const [view, setView] = useState<"library" | "tracks" | "notebook">(
+  const [view, setView] = useState<"library" | "tracks" | "notebook" | "cases">(
     "library",
   );
   const [books, setBooks] = useState<Book[]>([]),
@@ -274,6 +276,13 @@ export default function Workspace() {
             <Bookmark size={19} />
             My principles<span className="nav-count">{allItems.length}</span>
           </button>
+          <button
+            className={view === "cases" ? "nav-item active" : "nav-item"}
+            onClick={() => navigate("cases")}
+          >
+            <BriefcaseBusiness size={19} />
+            Work cases
+          </button>
         </nav>
         <div className="sidebar-note">
           <Leaf size={22} />
@@ -302,7 +311,9 @@ export default function Workspace() {
                   ? "My library"
                   : view === "tracks"
                     ? "Learning tracks"
-                    : "My principles"}
+                    : view === "cases"
+                      ? "Work cases"
+                      : "My principles"}
             </span>
           </div>
           <span className="local-chip">
@@ -427,6 +438,15 @@ export default function Workspace() {
               <Spinner />
               Opening book…
             </div>
+          ) : view === "cases" ? (
+            <WorkCases
+              configured={Boolean(status?.aiConfigured)}
+              onSource={(bookId, chapterId) => {
+                setView("library");
+                setBookId(bookId);
+                setChapterId(chapterId);
+              }}
+            />
           ) : view === "library" ? (
             <>
               <div className="page-heading">

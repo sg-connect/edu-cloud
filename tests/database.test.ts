@@ -1,3 +1,7 @@
+import { WorkRepository } from "../projects/database/src/work-cases";
+import { runCase } from "../projects/backend/src/work-cases";
+import { handleApi } from "../projects/backend/src/api";
+import { caseInput, caseReport, learningSource } from "./work-case-fixtures";
 import { beforeAll, afterAll, describe, it, expect, vi } from "vitest";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import { readFile, readdir } from "node:fs/promises";
@@ -184,4 +188,112 @@ it("processes a large chapter in resumable sections without losing text or citat
   expect((await repo.analysisParts("large-job", "test")).results).toHaveLength(
     0,
   );
+});
+
+it("persists work cases, retrieves learning, deduplicates jobs and rejects stale reviews", async () => {
+  const db = await mf.getD1Database("DB");
+  const cases = new WorkRepository(db);
+  await repo.createBook(
+    {
+      id: "case-book",
+      title: "Original notes",
+      filename: "fixture.pdf",
+      page_count: 7,
+      object_key: "pdf",
+      pages_key: "pages",
+    },
+    [{ title: "Retries", start_page: 1, end_page: 7 }],
+  );
+  const chapter = String((await repo.chapters("case-book")).results[0].id);
+  await repo.queueJob("source-job", chapter, 1, "fixture");
+  await repo.claim("source-job", "source-token");
+  await repo.finishJob("source-job", "source-token", {
+    model: "fixture",
+    input_tokens: 1,
+    output_tokens: 1,
+    content: {
+      overview: "Reliable queue workers",
+      principles: [
+        {
+          title: learningSource.title,
+          explanation: learningSource.text,
+          application: "Use a key",
+          tradeoff: "Storage",
+          page: 7,
+          evidence: learningSource.evidence,
+        },
+      ],
+      questions: [],
+    },
+  });
+  await repo.savePrinciple("reliability", chapter, {
+    title: learningSource.title,
+    explanation: learningSource.text,
+    page: 7,
+  });
+  await repo.saveNote(
+    chapter,
+    "Check the database constraint before deploying.",
+  );
+  const sources = (await cases.sources()).results;
+  expect(sources.filter((s) => s.chapter_id === chapter)).toHaveLength(3);
+  expect(
+    sources.find((s) => s.kind === "principle" && s.chapter_id === chapter)
+      ?.saved,
+  ).toBe(1);
+  await cases.create("case-one", caseInput);
+  await cases.queue("case-one", 1, "fixture");
+  const env = {
+    DB: db,
+    BOOKS: await mf.getR2Bucket("BOOKS"),
+    JOBS: { send: vi.fn() },
+    OPENAI_API_KEY: "fixture",
+    OPENAI_MODEL: "fixture",
+  } as Parameters<typeof runCase>[0];
+  const analyze = vi.fn().mockResolvedValue(caseReport);
+  await Promise.all([
+    runCase(env, "case-one", 1, analyze),
+    runCase(env, "case-one", 1, analyze),
+  ]);
+  expect(analyze).toHaveBeenCalledTimes(1);
+  expect((await cases.get("case-one"))?.status).toBe("ready");
+  expect(
+    JSON.parse((await cases.get("case-one"))!.result!).content.summary,
+  ).toBe(caseReport.content.summary);
+  await cases.queue("case-one", 1, "fixture");
+  await cases.claim("case-one", 1, "old-token");
+  expect(
+    (
+      await cases.update("case-one", 1, {
+        ...caseInput,
+        proposed_solution: "Use a unique operation key.",
+      })
+    ).meta.changes,
+  ).toBe(1);
+  expect((await cases.update("case-one", 1, caseInput)).meta.changes).toBe(0);
+  expect(
+    (await cases.finish("case-one", 1, "old-token", caseReport)).meta.changes,
+  ).toBe(0);
+  expect((await cases.get("case-one"))?.revision).toBe(2);
+  expect((await cases.get("case-one"))?.analyzed_revision).toBe(1);
+  const response = await handleApi(
+    new Request("http://localhost:3400/api/work-cases/case-one", {
+      method: "PUT",
+      headers: {
+        origin: "http://localhost:3400",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ ...caseInput, revision: 1 }),
+    }),
+    { ...env, APP_MODE: "local" } as BackendEnv,
+  );
+  expect(response.status).toBe(409);
+  await cases.queue("case-one", 2, "fixture");
+  await cases.claim("case-one", 2, "removed-token");
+  await cases.delete("case-one");
+  expect(
+    (await cases.finish("case-one", 2, "removed-token", caseReport)).meta
+      .changes,
+  ).toBe(0);
+  await repo.deleteBook("case-book");
 });

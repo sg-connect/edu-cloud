@@ -81,3 +81,11 @@ Limits: 100 MB PDFs, 600 pages, 3 million extracted characters per book, 30,000 
 - Authentication and per-user ownership: required before hosting.
 
 These capabilities have not been provisioned. Keep the initial app small and add each for a demonstrated requirement.
+
+## Work cases
+
+`work_cases` stores task context, an optional proposed solution, revisions, the latest report, and queue/lease state in D1. The existing queue accepts a case ID and revision. D1 conditional claims prevent duplicate review calls; edits clear the lease and increase the revision so a stale worker cannot publish. Deletion also invalidates in-flight results. Pending dispatch is recovered through the scheduled outbox reconciliation; expired work is explicitly retryable.
+
+The database repository enumerates principles and overviews from current chapter analyses, plus personal notes. Saved track principles boost ranking without duplicating entries. The backend performs bounded keyword retrieval over all entries, selects up to 24 within 48,000 serialized characters, and limits each selected text to 4,000 characters. This is a transparent first retrieval strategy, not semantic search or a claim that all material reaches the model. No new Cloudflare resources are required.
+
+Structured reports include approach, risks, solution strengths/concerns, revised solution, and open questions. Every returned source ID must belong to the selected sources. A report stores source snapshots and coverage counts alongside model/token usage; provenance validation does not establish that the advice is correct. The report is reused for display until the user explicitly requests another review. Saving/editing alone makes no AI call.
