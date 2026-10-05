@@ -9,6 +9,8 @@ A local learning workspace for senior software engineers. Upload a PDF, review i
 Requires Node.js 22.22.3 or newer within Node 22 and npm.
 
 ```sh
+git clone https://github.com/sg-connect/edu-cloud.git
+cd edu-cloud
 npm ci
 cp .env.example .env
 # Set OPENAI_API_KEY in .env. Keep an existing .env if already configured.
@@ -16,11 +18,39 @@ npm run types
 npm run dev
 ```
 
-Open **http://127.0.0.1:3400**. Use **Explore a sample chapter** to try the original three-page engineering sample, or upload a text-based PDF.
+A fresh install starts with **no books, analyses, notes, saved principles, or practice cases**. It creates only three empty starter tracks. Upload your own PDFs and use your own OpenAI key for analysis. You can browse the app and import books without an API key; analysis stays unavailable until you configure one.
+
+Open **http://127.0.0.1:3400**. Use **Explore a sample chapter** to try the original three-page engineering sample, or upload a text-based PDF. The optional sample is original, generated demonstration text—not a bundled book or another user’s data.
 
 `npm run dev` generates the sample, applies local D1 migrations, and starts both Workers through the Cloudflare Vite plugin. No Cloudflare login or hosted resources are needed. OpenAI analysis is a real, billable API call; uploads and reading do not call OpenAI.
 
 Local D1, R2, and queue state lives in ignored `.wrangler/state/`. The app uses a gitignored `.env`; restart after changing its key or model. The key is accessed only by server code and never returned to the browser. `.env.example` contains placeholders only.
+
+## Enable OpenAI analysis
+
+You need **your own OpenAI API key and paid API usage/credits**. Open [OpenAI API billing](https://platform.openai.com/settings/organization/billing/overview) to add credits or enable billing, then create a key on the [API keys page](https://platform.openai.com/api-keys). OpenAI's [official quickstart](https://developers.openai.com/api/docs/quickstart) explains these steps.
+
+Put your key in the project root `.env` file:
+
+```dotenv
+OPENAI_API_KEY=paste_your_own_key_here
+OPENAI_MODEL=gpt-5.6-luna
+```
+
+The code already reads this file automatically—**no source-code changes are needed**. Restart `npm run dev` after editing it. AI calls are billed to your OpenAI account; saving and uploading alone do not call AI.
+
+See the [step-by-step OpenAI setup guide](docs/openai-setup.md) for account setup, credits, key configuration, and troubleshooting.
+
+## What stays on your machine
+
+The public repository contains application source, migrations, documentation, and synthetic test fixtures. It does not include uploaded books, extracted pages, generated personal analyses, practice-case history, databases, or API keys.
+
+- `.env` contains your key and is ignored by Git. `.env.example` has a blank key.
+- `.wrangler/state/` contains your local D1, R2, and queue data and is ignored.
+- `.local/`, uploaded PDFs/EPUBs, build output, and browser test artifacts are ignored.
+- Each clone creates its own library. Nothing synchronizes your data to this GitHub repository.
+
+Share the GitHub link, not a ZIP of your working folder: the folder contains ignored personal data. Keep your local data when updating the code; do not remove `.wrangler/state/` unless you want to erase your library.
 
 ## Three Nx projects
 

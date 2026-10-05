@@ -22,3 +22,17 @@ test-results/
 
 .nx/
 **/dist/
+
+# Local database exports, backups, and credentials
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+*.dump
+backups/
+exports/
+secrets/
+*.pem
+*.key
