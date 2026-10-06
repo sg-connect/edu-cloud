@@ -336,3 +336,4 @@ export class Repository {
 }
 
 export { WorkRepository } from "./work-cases";
+export { ExamplesRepository } from "./examples";

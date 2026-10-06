@@ -1,3 +1,6 @@
+import { examplesInput, type ExampleSnapshot } from "../../../shared/examples";
+import { exampleSnapshot, dispatchExamples } from "./examples";
+import { ExamplesRepository } from "@edu/database";
 import { workCaseInput } from "../../../shared/work-cases";
 import { dispatchCases } from "./work-cases";
 import { Repository, WorkRepository } from "@edu/database";
@@ -111,6 +114,81 @@ export async function handleApi(
       .slice(1);
     const [resource, id, action] = parts;
     const method = request.method;
+    if (resource === "examples") {
+      const examples = new ExamplesRepository(env.DB);
+      if (!id && method === "GET") return json((await examples.list()).results);
+      if (!id && method === "POST") {
+        if (!env.OPENAI_API_KEY)
+          throw new HttpError(
+            503,
+            "Configure OpenAI before generating examples.",
+          );
+        const data = examplesInput.parse(await bodyJson(request));
+        const existing = await examples.get(data.id);
+        if (existing) {
+          const snapshot = JSON.parse(existing.snapshot) as ExampleSnapshot;
+          if (
+            snapshot.book_id !== data.book_id ||
+            existing.example_count !== data.count ||
+            snapshot.chapters
+              .map((c) => c.id)
+              .sort()
+              .join() !== [...new Set(data.chapter_ids)].sort().join()
+          )
+            throw new HttpError(
+              409,
+              "This run already exists with different selections.",
+            );
+        } else {
+          const book = await getBook(env, data.book_id);
+          const rows = (await examples.analyzed(book.id)).results.filter((c) =>
+            data.chapter_ids.includes(c.id),
+          );
+          if (rows.length !== data.chapter_ids.length)
+            throw new HttpError(
+              400,
+              "Select analyzed chapters from this book without duplicates.",
+            );
+          await examples.create(
+            data.id,
+            exampleSnapshot(book.id, book.title, rows),
+            data.count,
+            env.OPENAI_MODEL || "gpt-5.6-luna",
+          );
+        }
+        await dispatchExamples(env);
+        return json({ id: data.id }, 201);
+      }
+      const run = await examples.get(id);
+      if (!run) throw new HttpError(404, "Example run not found.");
+      if (!action && method === "GET")
+        return json({
+          id: run.id,
+          book_title: run.book_title,
+          example_count: run.example_count,
+          model: run.model,
+          status: run.status,
+          stage: run.stage,
+          error: run.error,
+          created_at: run.created_at,
+          input_tokens: run.input_tokens,
+          output_tokens: run.output_tokens,
+          snapshot: JSON.parse(run.snapshot),
+          result: run.result ? JSON.parse(run.result) : null,
+          sources: run.research ? JSON.parse(run.research).sources : [],
+        });
+      if (!action && method === "DELETE") {
+        await examples.delete(id);
+        return json({ ok: true });
+      }
+      if (action === "retry" && method === "POST") {
+        if (!env.OPENAI_API_KEY)
+          throw new HttpError(503, "Configure OpenAI before retrying.");
+        await examples.retry(id);
+        await dispatchExamples(env);
+        return json({ ok: true }, 202);
+      }
+    }
     if (resource === "work-cases") {
       const cases = new WorkRepository(env.DB);
       if (!id && method === "GET") return json((await cases.list()).results);

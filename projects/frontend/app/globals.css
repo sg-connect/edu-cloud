@@ -2093,3 +2093,180 @@ html[data-theme="dark"] .progress-banner {
 html[data-theme="dark"] .analyzed-table td[data-label]::before {
   color: #aebfad;
 }
+
+.examples-page {
+  --example-bg: #fff;
+  --example-line: #dce3dd;
+  --example-tint: #f1f6f0;
+  --example-muted: #58675e;
+}
+html[data-theme="dark"] .examples-page {
+  --example-bg: #202923;
+  --example-line: #3a483e;
+  --example-tint: #29392f;
+  --example-muted: #adbdaf;
+}
+.examples-layout {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.example-panel {
+  background: var(--example-bg);
+  border: 1px solid var(--example-line);
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 20px;
+}
+.example-panel h2 {
+  font-size: 19px;
+  margin: 0 0 16px;
+}
+.example-panel h3 {
+  font-size: 14px;
+  margin: 0 0 8px;
+}
+.example-panel p {
+  line-height: 1.7;
+  margin: 8px 0 16px;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.example-panel label {
+  display: block;
+  font-size: 13px;
+  margin: 16px 0;
+}
+.example-panel select {
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px solid var(--example-line);
+  border-radius: 8px;
+  background: var(--example-bg);
+  color: inherit;
+}
+.example-panel fieldset {
+  border: 1px solid var(--example-line);
+  border-radius: 8px;
+  padding: 12px;
+  max-height: 280px;
+  overflow: auto;
+  margin: 16px 0;
+}
+.example-panel legend,
+.example-note,
+.example-panel small {
+  font-size: 12px;
+  color: var(--example-muted);
+  line-height: 1.6;
+}
+.example-panel .example-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.example-checkbox input {
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+.example-panel small {
+  display: block;
+}
+.example-history {
+  max-height: 450px;
+  overflow: auto;
+}
+.example-history button {
+  display: block;
+  text-align: left;
+  width: 100%;
+  background: transparent;
+  color: inherit;
+  padding: 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  margin-bottom: 6px;
+}
+.example-history button.selected {
+  background: var(--example-tint);
+  border-color: var(--example-line);
+}
+.example-card-heading {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.example-card-heading h2 {
+  margin: 8px 0 0;
+}
+.example-number {
+  font-size: 28px;
+  color: var(--example-muted);
+}
+.example-story {
+  border-left: 2px solid var(--example-line);
+  padding-left: 20px;
+}
+.example-connection,
+.example-exercise {
+  border-radius: 10px;
+  background: var(--example-tint);
+  padding: 20px;
+  margin: 20px 0;
+}
+.example-connection button {
+  display: block;
+  text-align: left;
+  margin-top: 8px;
+}
+.example-card details {
+  padding: 12px 0;
+}
+.example-card summary {
+  cursor: pointer;
+  font-size: 14px;
+}
+.example-sources a {
+  display: block;
+  overflow-wrap: anywhere;
+  margin-top: 8px;
+  color: inherit;
+  text-decoration: underline;
+  font-size: 13px;
+}
+.example-steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  margin: 32px 0;
+}
+.example-steps b {
+  font-size: 13px;
+}
+@media (max-width: 1000px) {
+  .examples-layout {
+    grid-template-columns: 1fr;
+  }
+  .example-steps {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}
+.examples-page .text-button {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  padding: 6px 0;
+  font-size: 13px;
+}
+.examples-page .section-heading {
+  justify-content: space-between;
+  gap: 20px;
+  align-items: flex-start;
+}
+.examples-page .section-heading h2 {
+  margin-bottom: 0;
+}

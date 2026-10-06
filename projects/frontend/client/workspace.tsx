@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
+  Lightbulb,
   BriefcaseBusiness,
   ArrowLeft,
   ArrowRight,
@@ -31,6 +32,7 @@ import type {
   ChapterInput,
   Track,
 } from "@edu/contracts";
+import Examples from "./examples";
 import Analyzed from "./analyzed";
 import ThemeToggle from "./theme";
 import WorkCases from "./work-cases";
@@ -77,7 +79,7 @@ function Empty({
 
 export default function Workspace() {
   const [view, setView] = useState<
-    "library" | "tracks" | "notebook" | "cases" | "analyzed"
+    "library" | "tracks" | "notebook" | "cases" | "analyzed" | "examples"
   >("library");
   const [books, setBooks] = useState<Book[]>([]),
     [tracks, setTracks] = useState<Track[]>([]),
@@ -272,6 +274,13 @@ export default function Workspace() {
             Analyzed
           </button>
           <button
+            className={view === "examples" ? "nav-item active" : "nav-item"}
+            onClick={() => navigate("examples")}
+          >
+            <Lightbulb size={18} />
+            Real-world examples
+          </button>
+          <button
             className={view === "tracks" ? "nav-item active" : "nav-item"}
             onClick={() => navigate("tracks")}
           >
@@ -322,9 +331,11 @@ export default function Workspace() {
                     ? "Learning tracks"
                     : view === "cases"
                       ? "Practice cases"
-                      : view === "analyzed"
-                        ? "Analyzed"
-                        : "My principles"}
+                      : view === "examples"
+                        ? "Real-world examples"
+                        : view === "analyzed"
+                          ? "Analyzed"
+                          : "My principles"}
             </span>
           </div>
           <div className="topbar-actions">
@@ -367,7 +378,11 @@ export default function Workspace() {
                 }}
               >
                 <ArrowLeft size={16} />
-                {view === "analyzed" ? "Back to analyzed" : "Back to library"}
+                {view === "examples"
+                  ? "Back to examples"
+                  : view === "analyzed"
+                    ? "Back to analyzed"
+                    : "Back to library"}
               </button>
               <div className="page-heading compact">
                 <div>
@@ -452,6 +467,14 @@ export default function Workspace() {
               <Spinner />
               Opening book…
             </div>
+          ) : view === "examples" ? (
+            <Examples
+              configured={Boolean(status?.aiConfigured)}
+              onSource={(bookId, chapterId) => {
+                setBookId(bookId);
+                setChapterId(chapterId);
+              }}
+            />
           ) : view === "analyzed" ? (
             <Analyzed
               onOpen={(bookId, chapterId) => {

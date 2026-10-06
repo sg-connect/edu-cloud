@@ -208,24 +208,22 @@ describe("work case reviews", () => {
     ).toEqual([]);
   });
   it("includes the proposal and validates source IDs without exposing provider details", async () => {
-    const fetcher = vi
-      .fn<typeof fetch>()
-      .mockImplementation(async () =>
-        Response.json({
-          status: "completed",
-          output: [
-            {
-              content: [
-                {
-                  type: "output_text",
-                  text: JSON.stringify(caseReport.content),
-                },
-              ],
-            },
-          ],
-          usage: { input_tokens: 20, output_tokens: 30 },
-        }),
-      );
+    const fetcher = vi.fn<typeof fetch>().mockImplementation(async () =>
+      Response.json({
+        status: "completed",
+        output: [
+          {
+            content: [
+              {
+                type: "output_text",
+                text: JSON.stringify(caseReport.content),
+              },
+            ],
+          },
+        ],
+        usage: { input_tokens: 20, output_tokens: 30 },
+      }),
+    );
     const result = await reviewCase(
       "fixture",
       "fixture",
@@ -279,18 +277,16 @@ describe("work case reviews", () => {
       risks: [],
       solution_review: { strengths: [], concerns: [], revised_solution: "" },
     };
-    const fetcher = vi
-      .fn<typeof fetch>()
-      .mockResolvedValue(
-        Response.json({
-          status: "completed",
-          output: [
-            {
-              content: [{ type: "output_text", text: JSON.stringify(content) }],
-            },
-          ],
-        }),
-      );
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json({
+        status: "completed",
+        output: [
+          {
+            content: [{ type: "output_text", text: JSON.stringify(content) }],
+          },
+        ],
+      }),
+    );
     const result = await reviewCase(
       "fixture",
       "fixture",
@@ -300,5 +296,130 @@ describe("work case reviews", () => {
     );
     expect(result.coverage).toEqual({ searched: 0, selected: 0 });
     expect(result.content.approach[0].source_ids).toEqual([]);
+  });
+});
+
+import {
+  researchExamples,
+  writeExamples,
+  publicSourceUrl,
+  exampleSnapshot,
+} from "../projects/backend/src/examples";
+import {
+  exampleSnapshotFixture,
+  exampleResearchFixture,
+  exampleReportFixture,
+} from "./example-fixtures";
+describe("real-world example grounding", () => {
+  const response = (report: unknown) =>
+    vi
+      .fn()
+      .mockResolvedValue(
+        Response.json({
+          status: "completed",
+          output: [
+            {
+              content: [{ type: "output_text", text: JSON.stringify(report) }],
+            },
+          ],
+          usage: { input_tokens: 1, output_tokens: 2 },
+        }),
+      );
+  it("accepts explicit hypothetical examples and validates count, principle IDs and researched URLs", async () => {
+    const generate = (report: unknown, count = 3) =>
+      writeExamples(
+        "test",
+        "test",
+        exampleSnapshotFixture,
+        count,
+        exampleResearchFixture,
+        response(report),
+      );
+    expect((await generate(exampleReportFixture)).result.examples).toHaveLength(
+      3,
+    );
+    await expect(generate(exampleReportFixture, 5)).rejects.toThrow("number");
+    for (const patch of [
+      { principle_ids: ["invented"] },
+      { kind: "documented", source_urls: [] },
+      { kind: "documented", source_urls: ["https://invented.example/case"] },
+      { source_urls: ["https://example.com/engineering"] },
+    ]) {
+      const report = structuredClone(exampleReportFixture);
+      Object.assign(report.examples[0], patch);
+      await expect(generate(report)).rejects.toThrow();
+    }
+    const report = structuredClone(exampleReportFixture);
+    report.examples[0].kind = "documented";
+    report.examples[0].source_urls = ["https://example.com/engineering"];
+    expect((await generate(report)).result.examples[0].kind).toBe("documented");
+  });
+  it("requires tool-supplied public sources and requests web search without provider storage", async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValue(
+        Response.json({
+          status: "completed",
+          output: [
+            {
+              type: "web_search_call",
+              action: {
+                sources: [
+                  { url: "https://example.com/engineering", title: "Evidence" },
+                  { url: "http://localhost/private" },
+                ],
+              },
+            },
+            {
+              content: [
+                { type: "output_text", text: "Evidence from research" },
+              ],
+            },
+          ],
+        }),
+      );
+    expect(
+      (
+        await researchExamples(
+          "test",
+          "test",
+          exampleSnapshotFixture,
+          3,
+          fetcher,
+        )
+      ).sources,
+    ).toHaveLength(1);
+    const body = JSON.parse(fetcher.mock.calls[0][1].body);
+    expect(body.store).toBe(false);
+    expect(body.tools).toEqual([{ type: "web_search" }]);
+    expect(body.tool_choice).toBe("required");
+    await expect(
+      researchExamples("test", "test", exampleSnapshotFixture, 3, response({})),
+    ).rejects.toThrow("source links");
+    for (const url of [
+      "javascript:alert(1)",
+      "https://127.0.0.1/a",
+      "https://user:pass@example.com/a",
+      "https://machine.local/a",
+    ])
+      expect(publicSourceUrl(url)).toBeNull();
+  });
+  it("represents every selected chapter and reports bounded principle coverage", () => {
+    const rows = Array.from({ length: 100 }, (_, i) => ({
+      id: String(i),
+      title: "Chapter",
+      content: JSON.stringify({
+        ...valid,
+        principles: Array.from({ length: 20 }, () => ({
+          ...valid.principles[0],
+          explanation: "x".repeat(1000),
+        })),
+      }),
+    }));
+    const snapshot = exampleSnapshot("b", "Book", rows);
+    expect(snapshot.chapters).toHaveLength(100);
+    expect(snapshot.chapters.every((c) => c.principles.length > 0)).toBe(true);
+    expect(snapshot.total_principles).toBe(2000);
+    expect(snapshot.included_principles).toBeLessThan(2000);
   });
 });

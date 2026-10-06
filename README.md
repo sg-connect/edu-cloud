@@ -124,3 +124,13 @@ Use material you have permission to process. Private books, extracted text, gene
 - [Source-analysis design](docs/content-pipeline.md)
 - [Roadmap](docs/roadmap.md)
 - [Example practical lab](docs/first-lab.md)
+
+### Real-world examples
+
+Open **Real-world examples** in the left menu, select an analyzed book and its chapters, then choose **3 or 5 examples**. The app uses the same `OPENAI_MODEL` as chapter analysis (default `gpt-5.6-luna`), with OpenAI web search to research published engineering cases. Each example explains the problem, decision, outcome, connection to your reading, tradeoffs, and an exercise to try at work.
+
+Web-sourced cases include clickable evidence. Principle connections are AI interpretations, not claims that a company followed your book; check the sources. If evidence is insufficient, hypothetical examples are explicitly labeled. Sources and principle IDs are validated against the research and selected chapter snapshot, but this does not independently verify every factual claim.
+
+Every run is saved in local D1, including its selected principles, research checkpoint and final examples. Return to **Saved runs** without another AI call. Retrying a failed explanation reuses completed research. A new generation creates a separate history entry. Saved runs survive removing a book, so delete unwanted runs separately; links to a deleted chapter will no longer open.
+
+Summarized chapter principles are sent to OpenAI, with instructions to search generic engineering topics. Research uses web-search calls, followed by a separate structured explanation call; both token usage and search fees are billed to your OpenAI account. You need API credits and a model with web-search and structured-output support. Large selections use a bounded, balanced subset of principles; the saved run displays coverage. Select fewer chapters for more detail. Local migrations run automatically with `npm run dev` (or run `npm run db:migrate` for an existing session).

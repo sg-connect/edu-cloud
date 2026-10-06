@@ -412,3 +412,118 @@ it("lists completed current chapters across books and saves principles beyond th
     ),
   ).toBe(false);
 });
+
+import { ExamplesRepository } from "../projects/database/src/examples";
+import { runExamples } from "../projects/backend/src/examples";
+import {
+  exampleSnapshotFixture,
+  exampleResearchFixture,
+  exampleReportFixture,
+} from "./example-fixtures";
+it("checkpoints example research, retries synthesis, deduplicates workers and protects deleted runs", async () => {
+  const db = await mf.getD1Database("DB"),
+    examples = new ExamplesRepository(db);
+  const env = {
+    DB: db,
+    BOOKS: await mf.getR2Bucket("BOOKS"),
+    OPENAI_API_KEY: "test",
+    OPENAI_MODEL: "test",
+    APP_MODE: "local",
+    JOBS: { send: vi.fn().mockResolvedValue(undefined) },
+  } as unknown as BackendEnv;
+  const research = vi.fn().mockResolvedValue(exampleResearchFixture),
+    write = vi
+      .fn()
+      .mockRejectedValueOnce(new ProviderError("Try again"))
+      .mockResolvedValue({
+        result: exampleReportFixture,
+        input_tokens: 5,
+        output_tokens: 6,
+      });
+  await examples.create("examples-test", exampleSnapshotFixture, 3, "test");
+  await Promise.all([
+    runExamples(env, "examples-test", research, write),
+    runExamples(env, "examples-test", research, write),
+  ]);
+  expect(research).toHaveBeenCalledTimes(1);
+  expect(write).not.toHaveBeenCalled();
+  expect((await examples.get("examples-test"))?.stage).toBe("examples");
+  await runExamples(env, "examples-test", research, write);
+  expect((await examples.get("examples-test"))?.status).toBe("failed");
+  await examples.retry("examples-test");
+  await runExamples(env, "examples-test", research, write);
+  expect(research).toHaveBeenCalledTimes(1);
+  expect((await examples.get("examples-test"))?.status).toBe("ready");
+  expect((await examples.get("examples-test"))?.input_tokens).toBe(15);
+  await runExamples(env, "examples-test", research, write);
+  expect(write).toHaveBeenCalledTimes(2);
+  await examples.create("delete-test", exampleSnapshotFixture, 3, "test");
+  await examples.claim("delete-test", "owner");
+  await examples.delete("delete-test");
+  expect(
+    (await examples.finish("delete-test", "owner", exampleReportFixture, 0, 0))
+      .meta.changes,
+  ).toBe(0);
+  const request = (body: unknown) =>
+    new Request("http://localhost/api/examples", {
+      method: "POST",
+      headers: {
+        origin: "http://localhost",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+  await repo.createBook(
+    {
+      id: "example-api-book",
+      title: "Original test",
+      filename: "test.pdf",
+      page_count: 1,
+      object_key: "none",
+      pages_key: "none",
+    },
+    [{ title: "Chapter", start_page: 1, end_page: 1 }],
+  );
+  expect(
+    (
+      await handleApi(
+        request({
+          id: crypto.randomUUID(),
+          book_id: "example-api-book",
+          chapter_ids: ["foreign-chapter"],
+          count: 3,
+        }),
+        env,
+      )
+    ).status,
+  ).toBe(400);
+  const chapter = (await repo.chapters("example-api-book")).results[0];
+  await repo.queueJob("example-analysis", chapter.id, 1, "test");
+  await repo.claim("example-analysis", "owner");
+  await repo.finishJob("example-analysis", "owner", {
+    content: {
+      overview: "Original sample",
+      principles: [
+        { title: "Retries", explanation: "Use stable identity", page: 1 },
+      ],
+    },
+    model: "test",
+    input_tokens: 0,
+    output_tokens: 0,
+  });
+  const body = {
+    id: crypto.randomUUID(),
+    book_id: "example-api-book",
+    chapter_ids: [chapter.id],
+    count: 3,
+  };
+  expect((await handleApi(request(body), env)).status).toBe(201);
+  expect((await handleApi(request(body), env)).status).toBe(201);
+  expect((await handleApi(request({ ...body, count: 5 }), env)).status).toBe(
+    409,
+  );
+  await repo.deleteBook("example-api-book");
+  expect(JSON.parse((await examples.get(body.id))!.snapshot).book_title).toBe(
+    "Original test",
+  );
+});
